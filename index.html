@@ -137,6 +137,29 @@ body.hasnav #app{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
 #toast.on{opacity:1;transform:translate(-50%,0)}
 .code{width:100%;min-height:90px;font:12px ui-monospace,monospace;border:1.5px solid var(--line);border-radius:10px;padding:8px;background:var(--bg);color:var(--ink);word-break:break-all}
 @media (prefers-reduced-motion: reduce){#splash svg,#splash .sn,#splash .ss{animation:none}#splash{transition:none}}
+/* ---------- Horizontal (v28) ---------- */
+.lvl,.lvr{min-width:0}
+@media (orientation:landscape) and (max-height:560px){
+  #app{max-width:920px;padding:10px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+  #topbar{padding:calc(4px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 4px max(16px,env(safe-area-inset-left,0px))}
+  #topbar .in{max-width:920px}
+  #topbar svg{width:26px;height:26px}
+  #topbar .tt{font-size:15px}
+  body.inmatch #topbar{display:none}
+  #tabbar{padding:2px max(4px,env(safe-area-inset-right,0px)) calc(2px + env(safe-area-inset-bottom,0px)) max(4px,env(safe-area-inset-left,0px))}
+  #tabbar .in{max-width:680px}
+  #tabbar button{flex-direction:row;justify-content:center;min-height:40px;gap:6px;font-size:12px;padding:4px 2px}
+  #tabbar button svg{width:20px;height:20px}
+  body.hasnav #app{padding-bottom:calc(60px + env(safe-area-inset-bottom,0px))}
+  #toast{bottom:calc(56px + env(safe-area-inset-bottom,0px))}
+  .lv{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+  .lv>.lvl{position:sticky;top:8px;max-height:calc(100vh - 16px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .lv .board{margin-top:0;padding:10px 12px}
+  .lv .board .num{font-size:40px}
+  .lv .event{margin-top:6px;padding-top:6px}
+  .lv .card{margin:10px 0}
+  .lv>.lvr>.card:first-child{margin-top:0}
+}
 </style>
 </head>
 <body>
@@ -2504,6 +2527,7 @@ function play(strat){if(strat)M.strat=strat;liveGo()}
 function liveSteps(){return S.spd==="r"?15:30}
 function liveGo(){
   if(!M||M.done||M.i>=M.n)return;
+  sndCtx();
   M.run=true;
   if(!M.cur)newTramo();
   showLive();
@@ -2516,7 +2540,7 @@ function newTramo(){
   var r=segment(M.strat,N);
   M.cur={snap:snap,r:r,lines:M.log.slice(),k:0,t:0,st:M.strat};
 }
-function showLine(e){M.shown.push(e);if(M.shown.length>80)M.shown.splice(0,M.shown.length-80);M.dMe=e.me;M.dOp=e.op}
+function showLine(e){sndLine(e);M.shown.push(e);if(M.shown.length>80)M.shown.splice(0,M.shown.length-80);M.dMe=e.me;M.dOp=e.op}
 function liveTick(){
   if(!M||M.done||!M.run||!M.cur)return;
   var c=M.cur,steps=liveSteps();c.t++;
@@ -2534,6 +2558,7 @@ function endTramo(){
   fatigue(c.st);
   M.i++;M.gt=M.i*48/M.n;
   M.event=describe(c.r);
+  if(M.i>=M.n||M.i%(M.n/4)===0)sndPlay("buzz");
   if(M.i>=M.n){
     M.run=false;clearTimeout(LT);M.event="Terminó el partido.";
     if(Math.abs(M.me-M.op)<=3&&!M.used.last){M.used.last=1;lastPoss();return}
@@ -2595,15 +2620,15 @@ function decHTML(){
 }
 function showLive(){
   M.dk=M.dec?M.dec.t+M.dec.at:"";
-  $('<div id="lvbd">'+liveBoard()+'</div>'+
+  $('<div class="lv"><div class="lvl"><div id="lvbd">'+liveBoard()+'</div>'+
     '<div class="three"><button class="primary" style="padding:10px;min-height:44px;font-size:15px" onclick="liveStop()">❚❚ Pausa</button>'+
     '<button class="ghost" id="lvto" '+(M.tos>0?'':'disabled')+' style="padding:8px 4px" onclick="liveTO()">Tiempo muerto</button>'+
     '<button class="ghost" onclick="clearTimeout(LT);M.run=false;showBoxLive()">Planilla</button></div>'+
     '<div id="lvdec">'+decHTML()+'</div>'+
-    '<div class="card"><h2 style="margin-bottom:6px">Estrategia</h2><div id="lvst" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">'+stratBtns()+'</div></div>'+
+    '<div class="card"><h2 style="margin-bottom:6px">Estrategia</h2><div id="lvst" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">'+stratBtns()+'</div></div></div><div class="lvr">'+
     '<div class="card"><h2>Jugadas</h2><div id="lvlog">'+liveLog()+'</div></div>'+
     '<div class="card"><h2>En cancha</h2><p class="muted" style="margin:-4px 0 4px;font-size:13px">Los cambios los hace el asistente. Los puntos de cada uno, en Planilla.</p><div id="lvct">'+liveCourt()+'</div></div>'+
-    '<div class="row" style="gap:8px"><span class="muted">Velocidad</span><button class="ghost" id="lvsp" style="width:auto;padding:8px 14px" onclick="liveSpd()">'+(S.spd==="r"?"Rápida":"Normal")+'</button></div>');
+    '<div class="row" style="gap:8px"><span class="muted">Velocidad</span><button class="ghost" id="lvsp" style="width:auto;padding:8px 14px" onclick="liveSpd()">'+(S.spd==="r"?"Rápida":"Normal")+'</button><span style="flex:1"></span>'+sndBtn()+'</div></div></div>');
 }
 function updLive(){
   if(!M||!M.run)return;
@@ -2805,19 +2830,19 @@ function showMoment(){
   var opts=function(sel){return '<option value="">Nadie en especial</option>'+c.map(function(p){return '<option value="'+i2(p.name)+'"'+(p.name===sel?' selected':'')+'>'+sn(p.name)+'</option>'}).join("")};
   var lbl=M.i===0&&!M.cur?"Antes del salto":M.cur?"Pausa · "+gameClock():M.i===M.n/2?"Entretiempo":"Final del "+(M.i/(M.n/4))+"º cuarto";
   var SD={bal:"Sin riesgos, cansancio normal",atk:"Más puntos, pero te cansás más y defendés peor",def:"Menos posesiones y frenás al rival, pero anotás menos",tri:"Más riesgo, más premio. Tiro de tu quinteto: "+Math.round(cAvg('tir'))+"."};
-  $(pauseBoard(lbl)+decHTML()+
+  $('<div class="lv"><div class="lvl">'+pauseBoard(lbl)+decHTML()+
     '<button class="primary" style="margin-top:10px" onclick="liveGo()">'+(M.i===0&&!M.cur?"▶ Empezar el partido":"▶ Seguir")+'</button>'+
     '<h2 style="margin-top:14px">Estrategia</h2>'+
     Object.keys(STRATN).map(function(k){return '<button class="opt'+(M.strat===k?' sel':'')+'" onclick="setStrat(\''+k+'\')"><b>'+(k==="tri"?"Forzar triples":STRATN[k])+'</b><span>'+SD[k]+'</span></button>'}).join("")+
     '<div class="two"><button class="ghost" '+(M.tos>0?'':'disabled')+' onclick="timeout()">Tiempo muerto ('+M.tos+')</button>'+
-    '<button class="ghost" onclick="showBoxLive()">Planilla</button></div>'+logHTML()+
+    '<button class="ghost" onclick="showBoxLive()">Planilla</button></div><div class="row" style="margin-top:8px"><span class="muted">Sonido del partido</span>'+sndBtn()+'</div></div><div class="lvr">'+logHTML()+
     '<div class="card"><h2>En cancha</h2><p class="muted" style="margin:-4px 0 4px;font-size:13px">Los cambios los hace el asistente solo. Si querés, tocá un jugador para cambiarlo vos.</p>'+rows+'</div>'+oppHTML()+
     '<div class="card" style="margin-top:12px"><h2>Instrucciones</h2>'+
     '<label class="muted" style="display:block;font-size:14px">Darle la pelota a</label><select style="width:100%;padding:10px;margin:4px 0 10px;font-size:16px;border-radius:10px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink)" onchange="setFocus(this.value)">'+opts(M.focus)+'</select>'+
     '<label class="muted" style="display:block;font-size:14px">A qué rival marcás</label><select style="width:100%;padding:10px;margin:4px 0 10px;font-size:16px;border-radius:10px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink)" onchange="setMk(this.value)">'+oppCourt().map(function(p,j){return '<option value="'+j+'"'+(p.name===M.opp.mk?' selected':'')+'>'+sn(p.name)+(p.name===M.opp.star?' (figura)':'')+'</option>'}).join("")+'</select>'+
     '<label class="muted" style="display:block;font-size:14px">Quién marca a '+sn(M.opp.mk)+'</label><select style="width:100%;padding:10px;margin:4px 0 6px;font-size:16px;border-radius:10px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink)" onchange="setStop(this.value)">'+opts(M.stop)+'</select>'+
     (M.dbl?'<p class="muted" style="margin:6px 0 0">Doble marca activa sobre '+sn(M.opp.mk)+'. <a href="#" onclick="M.dbl=false;showMoment();return false">Quitarla</a></p>':'')+
-    '<p class="muted" style="margin:6px 0 0;font-size:13px">El jugador con la pelota tira más y se cansa más. El que marca al rival elegido le hace tirar peor, según su defensa individual.</p></div>');
+    '<p class="muted" style="margin:6px 0 0;font-size:13px">El jugador con la pelota tira más y se cansa más. El que marca al rival elegido le hace tirar peor, según su defensa individual.</p></div></div></div>');
 }
 function i2(n){var k=-1;M.roster.forEach(function(p,j){if(p.name===n)k=j});return k}
 function setFocus(v){M.focus=v===""?null:M.roster[+v].name;M.event=M.focus?"La pelota pasa por "+sn(M.focus)+".":"Juego repartido entre todos.";showMoment()}
@@ -2938,7 +2963,7 @@ function topBar(){
   else{sub.textContent="Tu carrera como entrenador";rp.textContent=""}
 }
 var $orig=$;
-$=function(h,keep){$orig(h,keep);try{topBar();navBar();saveBtn();offBar()}catch(e){}NAVTAB=null;if(typeof CL!=="undefined"&&CL.pending)setTimeout(tryApplyPending,0)};
+$=function(h,keep){$orig(h,keep);try{topBar();navBar();saveBtn();offBar();matchEnv()}catch(e){}NAVTAB=null;if(typeof CL!=="undefined"&&CL.pending)setTimeout(tryApplyPending,0)};
 function showMore(){
   var it=[["showStats()","Estadísticas","Goleadores, rebotes y asistencias de la liga"],
     ["showNews()","Noticias"+(unread()?" ("+unread()+")":""),"Lo que pasa en tu liga y en tu club"],
@@ -3251,7 +3276,7 @@ function showSave(msg){
   PRECODE="";if(navigator.share&&S&&S.my){packState().then(function(c){PRECODE=c})}
 }
 /* El iPhone solo abre Compartir si se llama apenas se toca el botón: el código se arma antes, al abrir la pantalla */
-var PRECODE="",GAMEVER="27.3";
+var PRECODE="",GAMEVER="28";
 function shareCode(){
   if(!PRECODE){exportCode();return}
   navigator.share({title:"Partida Basket Manager",text:PRECODE}).then(function(){toast("Código enviado ✓")},function(e){if(!e||e.name!=="AbortError")exportCode()});
@@ -3284,6 +3309,105 @@ else if(S.cx&&S.phase==="end"&&S.my)showContracts();else showHub();
 }
 startScreen();
 cloudInit();
+</script>
+<script>
+/* ---------- v28: sonido de partido y pantalla encendida ---------- */
+var SND={ctx:null,crowd:null,last:{},nb:null};
+function sndOn(){return !(S&&S.snd===0)}
+function sndCtx(){
+  try{
+    if(!SND.ctx){var A=window.AudioContext||window.webkitAudioContext;if(!A)return null;
+      if(navigator.audioSession)try{navigator.audioSession.type="ambient"}catch(e){}
+      SND.ctx=new A()}
+    if(SND.ctx.state!=="running")SND.ctx.resume();
+  }catch(e){return null}
+  return SND.ctx;
+}
+document.addEventListener("touchend",function(){if(SND.ctx&&SND.ctx.state!=="running")sndCtx()},{passive:true});
+function sndNoise(){
+  var c=SND.ctx;if(SND.nb)return SND.nb;
+  var n=c.sampleRate*2,b=c.createBuffer(1,n,c.sampleRate),d=b.getChannelData(0),l=0,i,w;
+  for(i=0;i<n;i++){w=Math.random()*2-1;l=(l+0.04*w)/1.04;d[i]=l*3.5+w*0.15}
+  SND.nb=b;return b;
+}
+function sndSrc(f,q,type){
+  var c=SND.ctx,s=c.createBufferSource(),fl=c.createBiquadFilter();
+  s.buffer=sndNoise();s.loop=true;s.playbackRate.value=0.8+Math.random()*0.4;
+  fl.type=type||"bandpass";fl.frequency.value=f;fl.Q.value=q;s.connect(fl);return {s:s,f:fl};
+}
+function sndEnv(g,t,a,peak,dec){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+dec)}
+function crowdLevel(v){
+  var c=SND.ctx;if(!c)return;
+  if(!SND.crowd){if(!v)return;
+    var x=sndSrc(700,0.6),g=c.createGain(),lf=c.createOscillator(),lg=c.createGain();
+    g.gain.value=0;lf.frequency.value=0.13;lg.gain.value=0.012;lf.connect(lg);lg.connect(g.gain);
+    x.f.connect(g);g.connect(c.destination);x.s.start();lf.start();SND.crowd={g:g}}
+  SND.crowd.g.gain.setTargetAtTime(v,c.currentTime,0.6);
+}
+function sndCheer(t,peak,dur){
+  var c=SND.ctx,x=sndSrc(1000,0.7),y=sndSrc(2200,1.2),g=c.createGain();
+  x.f.connect(g);y.f.connect(g);g.connect(c.destination);
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+0.25);g.gain.setTargetAtTime(0.0001,t+0.4,dur/3);
+  x.s.start(t);y.s.start(t);x.s.stop(t+dur+0.5);y.s.stop(t+dur+0.5);
+}
+function sndPlay(k){
+  var c=SND.ctx;if(!sndOn()||!c||c.state!=="running")return;
+  var now=c.currentTime;if(SND.last[k]&&now-SND.last[k]<0.25)return;SND.last[k]=now;
+  var t=now+0.02,o,g,x,lf,lg;
+  if(k==="bounce"){
+    for(var i=0;i<2;i++){o=c.createOscillator();g=c.createGain();o.type="sine";var ti=t+i*0.28;
+      o.frequency.setValueAtTime(170,ti);o.frequency.exponentialRampToValueAtTime(55,ti+0.12);
+      sndEnv(g,ti,0.004,i?0.25:0.4,0.14);o.connect(g);g.connect(c.destination);o.start(ti);o.stop(ti+0.2)}
+  }else if(k==="swish"){
+    x=sndSrc(4500,0.9);g=c.createGain();x.f.frequency.setValueAtTime(5500,t);x.f.frequency.exponentialRampToValueAtTime(1600,t+0.3);
+    sndEnv(g,t,0.03,0.35,0.3);x.f.connect(g);g.connect(c.destination);x.s.start(t);x.s.stop(t+0.4);
+  }else if(k==="mine"){sndPlay("swish");sndCheer(t+0.1,0.16,1.4)}
+  else if(k==="three"){sndPlay("swish");sndCheer(t+0.1,0.3,2.4)}
+  else if(k==="opp"){sndPlay("swish");sndCheer(t+0.1,0.06,0.9)}
+  else if(k==="whistle"){
+    o=c.createOscillator();g=c.createGain();lf=c.createOscillator();lg=c.createGain();
+    o.frequency.value=2650;lf.frequency.value=38;lg.gain.value=140;lf.connect(lg);lg.connect(o.frequency);
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.14,t+0.02);g.gain.setValueAtTime(0.14,t+0.32);g.gain.exponentialRampToValueAtTime(0.0001,t+0.42);
+    o.connect(g);g.connect(c.destination);o.start(t);lf.start(t);o.stop(t+0.45);lf.stop(t+0.45);
+  }else if(k==="buzz"){
+    g=c.createGain();var fl=c.createBiquadFilter();fl.type="lowpass";fl.frequency.value=1400;fl.connect(g);g.connect(c.destination);
+    [196,199].forEach(function(f){var q=c.createOscillator();q.type="square";q.frequency.value=f;q.connect(fl);q.start(t);q.stop(t+1.1)});
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.12,t+0.03);g.gain.setValueAtTime(0.12,t+0.95);g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);
+  }
+}
+function sndLine(e){
+  if(!M||!M.run||!e||typeof e.me!=="number")return;
+  var dm=e.me-M.dMe,dop=e.op-M.dOp;
+  if(/falta|Tiempo muerto/i.test(e.t))sndPlay("whistle");
+  if(dm>0)sndPlay(dm>=3?"three":"mine");
+  else if(dop>0)sndPlay("opp");
+  else if(/rebote/i.test(e.t))sndPlay("bounce");
+}
+function sndBtn(){var on=sndOn();return '<button class="ghost lvsnd" style="width:auto;padding:8px 14px" onclick="sndToggle()" aria-pressed="'+on+'">'+(on?"🔊 Sonido":"🔇 Sin sonido")+'</button>'}
+function sndToggle(){
+  S.snd=sndOn()?0:1;save();if(sndOn())sndCtx();matchEnv();
+  var on=sndOn();Array.prototype.forEach.call(document.querySelectorAll(".lvsnd"),function(b){b.textContent=on?"🔊 Sonido":"🔇 Sin sonido";b.setAttribute("aria-pressed",on)});
+}
+/* Pantalla encendida mientras corre el partido (iPhone: iOS 18.4 o más nuevo) */
+var WL={lock:null,want:false};
+function wakeSet(on){
+  WL.want=on;
+  if(!("wakeLock" in navigator))return;
+  if(on&&!WL.lock&&document.visibilityState==="visible"){
+    WL.lock="pidiendo";
+    navigator.wakeLock.request("screen").then(function(l){
+      if(!WL.want){l.release().catch(function(){});WL.lock=null;return}
+      WL.lock=l;l.addEventListener("release",function(){if(WL.lock===l)WL.lock=null});
+    }).catch(function(){WL.lock=null});
+  }else if(!on&&WL.lock&&WL.lock!=="pidiendo"){var l=WL.lock;WL.lock=null;l.release().catch(function(){})}
+}
+document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"&&WL.want)wakeSet(true)});
+function matchEnv(){
+  var im=typeof M!=="undefined"&&M&&!M.done&&M.roster,run=!!(im&&M.run);
+  document.body.classList.toggle("inmatch",!!im);
+  wakeSet(run);
+  crowdLevel(run&&sndOn()?0.05:0);
+}
 </script>
 <script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost"))navigator.serviceWorker.register("sw.js").catch(function(){});</script>
 </body>
