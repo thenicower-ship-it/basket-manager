@@ -3246,11 +3246,11 @@ function showSave(msg){
       '<button class="ghost" onclick="exportCode()">Copiar partida</button><div id="expbox"></div></div>'+
     '<div class="card"><h2>Pegar partida</h2><p class="muted">Pegá un código guardado para recuperar esa partida. Reemplaza la partida actual.</p>'+
       '<textarea id="impcode" class="code" placeholder="Pegá el código acá"></textarea>'+
-      '<button class="ghost" style="margin-top:8px" onclick="importCode()">'+(IMPCONF?"Tocá de nuevo para reemplazar tu partida":"Cargar partida")+'</button></div>');
+      '<button class="ghost" style="margin-top:8px" onclick="importCode()">'+(IMPCONF?"Tocá de nuevo para reemplazar tu partida":"Cargar partida")+'</button></div><p class="muted" style="text-align:center">Versión '+GAMEVER+'</p>');
   PRECODE="";if(navigator.share&&S&&S.my){packState().then(function(c){PRECODE=c})}
 }
 /* El iPhone solo abre Compartir si se llama apenas se toca el botón: el código se arma antes, al abrir la pantalla */
-var PRECODE="";
+var PRECODE="",GAMEVER="27.2";
 function shareCode(){
   if(!PRECODE){exportCode();return}
   navigator.share({title:"Partida Basket Manager",text:PRECODE}).then(function(){toast("Código enviado ✓")},function(e){if(!e||e.name!=="AbortError")exportCode()});
@@ -3265,6 +3265,7 @@ function exportCode(){
     if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(code).then(function(){mg.textContent="Código copiado ✓ Pegalo en tus notas."},manual);else manual();
   });
 }
+function esc(s){return String(s).replace(/[&<>"]/g,function(x){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[x]})}
 function importCode(){
   var ta=document.getElementById("impcode"),code=ta?ta.value:"";
   if(!code.trim()){IMPCONF=false;showSave("Primero pegá el código en el cuadro.");return}
@@ -3272,7 +3273,7 @@ function importCode(){
     if(!validState(o)){IMPCONF=false;showSave("Ese código no es una partida válida.");return}
     if(S&&S.my&&!IMPCONF){IMPCONF=true;var keep=code;showSave();document.getElementById("impcode").value=keep;setTimeout(function(){IMPCONF=false},6000);return}
     IMPCONF=false;applyState(o);save();cloudQueue(true);toast("Partida cargada ✓ "+TEAMS[S.my].name+", temporada "+S.season);
-  },function(e){IMPCONF=false;showSave(e==="corto"?"El código quedó cortado: falta una parte del final. Volvé a copiarlo entero (mejor con Enviar a Notas) y pegalo de nuevo.":"Ese código no es una partida válida. Revisá que esté completo.")});
+  },function(e){IMPCONF=false;var c=code.trim();showSave((e==="corto"?"El código quedó cortado: falta una parte del final. Volvé a copiarlo entero (mejor con Enviar a Notas) y pegalo de nuevo.":"Ese código no es una partida válida. Revisá que esté completo.")+'<br><span class="muted">Llegaron '+c.length+' letras · empieza con "'+esc(c.slice(0,6))+'" · termina con "'+esc(c.slice(-4))+'" · '+esc(String(e&&e.message||e).slice(0,60))+'</span>')});
 }
 function hideSplash(){var sp=document.getElementById("splash");if(!sp||sp.classList.contains("out"))return;sp.classList.add("out");setTimeout(function(){if(sp.parentNode)sp.parentNode.removeChild(sp)},500)}
 setTimeout(hideSplash,1400);
