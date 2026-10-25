@@ -3124,11 +3124,13 @@ function unpackState(code){
   code=(code||"").trim();
   try{
     if(code.indexOf("BM0:")===0)return Promise.resolve(JSON.parse(code.slice(4)));
-    code=code.replace(/\s+/g,"");
+    var i0=code.indexOf("BM0:{");if(i0>0)return unpackState(code.slice(i0).replace(/\}[^}]*$/,"}"));
+    var re=/BM1:[A-Za-z0-9+\/=]+/,m=code.match(re);if(!m||(m[0].length-4)%4)m=code.replace(/\s+/g,"").match(re)||m;code=m?m[0]:code.replace(/\s+/g,"");
     if(code.indexOf("BM1:")===0){
       if(typeof DecompressionStream!=="function")return Promise.reject("nozip");
+      if((code.length-4)%4)return Promise.reject("corto");
       var ds=new Blob([unb64(code.slice(4))]).stream().pipeThrough(new DecompressionStream("gzip"));
-      return new Response(ds).text().then(function(t){return JSON.parse(t)});
+      return new Response(ds).text().then(function(t){return JSON.parse(t)},function(){throw "corto"});
     }
     if(code.charAt(0)==="{")return Promise.resolve(JSON.parse(code));
   }catch(e){return Promise.reject(e)}
@@ -3240,10 +3242,18 @@ function showSave(msg){
       (CL.state==="sin"?'':'<div class="gm"><span>En tu cuenta de Claude</span><b>'+cl+'</b></div>')+
       '<p class="muted" style="margin-top:8px">Último guardado: '+(SAVED_AT?hhmm(SAVED_AT):"—")+'. '+(CL.state==="sin"?'Para no perderla si cambiás de teléfono, cada tanto usá Copiar partida y guardá el código en tus notas.':'Con tu cuenta, la partida sigue aunque borres los datos o cambies de teléfono: abrí el mismo link con tu cuenta de Claude.')+'</p></div>'+
     '<div class="card"><h2>Copia de respaldo</h2><p class="muted">Un código con toda tu partida. Guardalo en tus notas o mandátelo por mensaje.</p>'+
+      (navigator.share?'<button class="ghost" style="margin-bottom:8px" onclick="shareCode()">Enviar a Notas o por mensaje</button>':'')+
       '<button class="ghost" onclick="exportCode()">Copiar partida</button><div id="expbox"></div></div>'+
     '<div class="card"><h2>Pegar partida</h2><p class="muted">Pegá un código guardado para recuperar esa partida. Reemplaza la partida actual.</p>'+
       '<textarea id="impcode" class="code" placeholder="Pegá el código acá"></textarea>'+
       '<button class="ghost" style="margin-top:8px" onclick="importCode()">'+(IMPCONF?"Tocá de nuevo para reemplazar tu partida":"Cargar partida")+'</button></div>');
+  PRECODE="";if(navigator.share&&S&&S.my){packState().then(function(c){PRECODE=c})}
+}
+/* El iPhone solo abre Compartir si se llama apenas se toca el botón: el código se arma antes, al abrir la pantalla */
+var PRECODE="";
+function shareCode(){
+  if(!PRECODE){exportCode();return}
+  navigator.share({title:"Partida Basket Manager",text:PRECODE}).then(function(){toast("Código enviado ✓")},function(e){if(!e||e.name!=="AbortError")exportCode()});
 }
 function exportCode(){
   save();
@@ -3262,7 +3272,7 @@ function importCode(){
     if(!validState(o)){IMPCONF=false;showSave("Ese código no es una partida válida.");return}
     if(S&&S.my&&!IMPCONF){IMPCONF=true;var keep=code;showSave();document.getElementById("impcode").value=keep;setTimeout(function(){IMPCONF=false},6000);return}
     IMPCONF=false;applyState(o);save();cloudQueue(true);toast("Partida cargada ✓ "+TEAMS[S.my].name+", temporada "+S.season);
-  },function(){IMPCONF=false;showSave("Ese código no es una partida válida. Revisá que esté completo.")});
+  },function(e){IMPCONF=false;showSave(e==="corto"?"El código quedó cortado: falta una parte del final. Volvé a copiarlo entero (mejor con Enviar a Notas) y pegalo de nuevo.":"Ese código no es una partida válida. Revisá que esté completo.")});
 }
 function hideSplash(){var sp=document.getElementById("splash");if(!sp||sp.classList.contains("out"))return;sp.classList.add("out");setTimeout(function(){if(sp.parentNode)sp.parentNode.removeChild(sp)},500)}
 setTimeout(hideSplash,1400);
