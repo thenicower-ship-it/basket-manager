@@ -2711,11 +2711,11 @@ function decHTML(){
 }
 function showLive(){
   M.dk=M.dec?M.dec.t+M.dec.at:"";
-  $('<div id="lvbd" class="stk">'+liveBoardC()+'</div><div id="lvct">'+liveCourt()+'</div>'+
+  $('<div class="stk"><div id="lvbd">'+liveBoardC()+'</div><div id="lvtip">'+tipHTML()+'</div></div><div id="lvct">'+liveCourt()+'</div>'+
     '<div class="three" style="margin-top:6px"><button class="primary" style="padding:10px;min-height:44px;font-size:15px" onclick="liveStop()">❚❚ Pausa</button>'+
     '<button class="ghost" id="lvto" '+(M.tos>0?'':'disabled')+' style="padding:8px 4px" onclick="liveTO()">Tiempo muerto</button>'+
     '<button class="ghost" onclick="showBoxLive()">Planilla</button></div>'+
-    '<div id="lvtip">'+tipHTML()+'</div><div id="lvdec">'+decHTML()+'</div>'+
+    '<div id="lvdec">'+decBar()+'</div>'+
     '<div class="card"><h2 style="margin-bottom:6px">Estrategia</h2><div id="lvst" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">'+stratBtns()+'</div></div>'+
     '<div class="card"><h2>Jugadas</h2><div id="lvlog">'+liveLog()+'</div></div>'+
     '<div class="row" style="gap:8px"><span class="muted">Velocidad</span><button class="ghost" id="lvsp" style="width:auto;padding:8px 14px" onclick="liveSpd()">'+(S.spd==="r"?"Rápida":"Normal")+'</button><span style="flex:1"></span>'+sndBtn()+'</div>'+
@@ -2728,7 +2728,7 @@ function updLive(){
   if(!g("lvbd")){showLive();return}
   g("lvbd").innerHTML=liveBoardC();g("lvlog").innerHTML=liveLog();g("lvct").innerHTML=liveCourt();
   var dk=M.dec?M.dec.t+M.dec.at:"";
-  if(dk!==M.dk){M.dk=dk;g("lvdec").innerHTML=decHTML()}
+  if(dk!==M.dk){M.dk=dk;g("lvdec").innerHTML=decBar();if(g("lvst"))g("lvst").innerHTML=stratBtns()}
   if(g("lvtip")&&M.tipS!==M.tip){M.tipS=M.tip;g("lvtip").innerHTML=tipHTML()}
   if(g("lvto"))g("lvto").disabled=M.tos<=0;
 }
@@ -2943,8 +2943,7 @@ function showMoment(){
   var opts=function(sel){return '<option value="">Nadie en especial</option>'+c.map(function(p){return '<option value="'+i2(p.name)+'"'+(p.name===sel?' selected':'')+'>'+sn(p.name)+'</option>'}).join("")};
   var lbl=M.i===0&&!M.cur?"Antes del salto":M.cur?"Pausa · "+gameClock():M.i===M.n/2?"Entretiempo":"Final del "+(M.i/(M.n/4))+"º cuarto";
   var SD={bal:"Sin riesgos, cansancio normal",atk:"Más puntos, pero te cansás más y defendés peor",def:"Menos posesiones y frenás al rival, pero anotás menos",tri:"Más riesgo, más premio. Tiro de tu quinteto: "+Math.round(cAvg('tir'))+"."};
-  $('<div class="lv"><div class="lvl"><div class="stk">'+pauseBoard(lbl)+'</div>'+(M.i===0&&!M.cur?preHTML():qtrHTML())+decHTML()+
-    '<button class="primary" style="margin-top:10px" onclick="liveGo()">'+(M.i===0&&!M.cur?"▶ Empezar el partido":"▶ Seguir")+'</button>'+
+  $('<div class="lv"><div class="lvl"><div class="stk">'+pauseBoard(lbl)+'</div>'+quickHTML()+decHTML()+(M.i===0&&!M.cur?preHTML():qtrHTML())+
     '<h2 style="margin-top:14px">Estrategia</h2>'+
     Object.keys(STRATN).map(function(k){return '<button class="opt'+(M.strat===k?' sel':'')+'" onclick="setStrat(\''+k+'\')"><b>'+(k==="tri"?"Forzar triples":STRATN[k])+'</b><span>'+SD[k]+'</span></button>'}).join("")+
     '<div class="two"><button class="ghost" '+(M.tos>0?'':'disabled')+' onclick="timeout()">Tiempo muerto ('+M.tos+')</button>'+
@@ -3402,7 +3401,7 @@ function showSave(msg){
   PRECODE="";if(navigator.share&&S&&S.my){packState().then(function(c){PRECODE=c})}
 }
 /* El iPhone solo abre Compartir si se llama apenas se toca el botón: el código se arma antes, al abrir la pantalla */
-var PRECODE="",GAMEVER="31";
+var PRECODE="",GAMEVER="32";
 function shareCode(){
   if(!PRECODE){exportCode();return}
   navigator.share({title:"Partida Basket Manager",text:PRECODE}).then(function(){toast("Código enviado ✓")},function(e){if(!e||e.name!=="AbortError")exportCode()});
@@ -3607,17 +3606,30 @@ function qtrHTML(){
 }
 function applyQtr(){var R=M.qrec&&M.qrec.r;if(!R||M.qok===M.i)return;if(R.to)timeout(true);if(R.st)M.strat=R.st;if(R.fo)M.focus=R.fo;M.qok=M.i;M.event="Hiciste lo que te sugirió el asistente.";showMoment()}
 function assistTip(){
-  var c=court(),F=FMAX(),ae=courtEn(),diff=M.me-M.op,i;
+  var c=court(),F=FMAX(),ae=courtEn(),diff=M.me-M.op;M.tipA=null;
   var ft=c.filter(function(p){return p.pf>=F-2})[0];if(ft)return sn(ft.name)+" tiene "+ft.pf+" faltas: ojo.";
-  if(ae<60)return "El quinteto está al "+Math.round(ae)+"% de energía."+(M.tos>0?" Un tiempo muerto ayuda.":"");
-  var t3h=M.t3h||[];if(t3h.length>=2&&t3h[t3h.length-1]-t3h[t3h.length-2]>=2)return "Nos metieron "+(t3h[t3h.length-1]-t3h[t3h.length-2])+" triples seguidos: hay que salir más a los tiradores.";
-  var s=oppSugg();if(!s.ok&&oppHot(s.p)>=6)return sn(s.p.name)+" está caliente ("+oppHot(s.p)+" pts recientes). Conviene marcarlo.";
-  var bp=c.slice().sort(function(a,b){return pir(b)-pir(a)})[0];if(bp&&pir(bp)>=10&&bp.name!==M.focus)return sn(bp.name)+" es el mejor en cancha (PIR "+pir(bp)+").";
+  if(ae<60){if(M.tos>0)M.tipA={k:"to",l:"Tiempo muerto"};return "El quinteto está al "+Math.round(ae)+"% de energía."+(M.tos>0?" Un tiempo muerto ayuda.":"")}
+  var t3h=M.t3h||[];if(t3h.length>=2&&t3h[t3h.length-1]-t3h[t3h.length-2]>=2){if(M.strat!=="def")M.tipA={k:"def",l:"Defensa"};return "Nos metieron "+(t3h[t3h.length-1]-t3h[t3h.length-2])+" triples seguidos: hay que salir a los tiradores."}
+  var s=oppSugg();if(!s.ok&&oppHot(s.p)>=6){M.tipA={k:"mk",l:"Marcarlo"};return sn(s.p.name)+" está caliente ("+oppHot(s.p)+" pts recientes). Que lo marque "+sn(s.d.name)+"."}
+  var bp=c.slice().sort(function(a,b){return pir(b)-pir(a)})[0];if(bp&&pir(bp)>=10&&bp.name!==M.focus){M.tipA={k:"fo",v:bp.name,l:"Dale la pelota"};return sn(bp.name)+" es el mejor en cancha (PIR "+pir(bp)+")."}
   if(diff>=10)return "Vamos +"+diff+". Sigamos concentrados atrás.";
-  if(diff<=-10)return "Vamos "+diff+". Hay tiempo, pero hay que meter un parcial.";
+  if(diff<=-10){if(M.strat!=="atk")M.tipA={k:"atk",l:"Ataque"};return "Vamos "+diff+". Hay que meter un parcial."}
   return "Todo en orden. El partido está "+(Math.abs(diff)<=4?"parejo":diff>0?"a favor":"en contra")+".";
 }
-function tipHTML(){return M.tip?'<div style="margin-top:8px;padding:8px 12px;border-radius:12px;background:var(--mine);border:1px solid var(--wood);font-size:14px"><b>🗣️ Asistente:</b> '+M.tip+'</div>':""}
+function tipDo(){
+  var A=M.tipA;if(!A||!M)return;M.tipA=null;
+  if(A.k==="to"){liveTO();M.tip="Hecho: tiempo muerto."}
+  else if(A.k==="def"||A.k==="atk"){M.strat=A.k;var el=document.getElementById("lvst");if(el)el.innerHTML=stratBtns();M.tip="Hecho: estrategia "+STRATN[A.k]+"."}
+  else if(A.k==="mk"){var s=oppSugg();if(!s.ok){M.opp.mk=s.p.name;M.stop=s.d.name;M.dbl=false;M.tip="Hecho: "+sn(s.d.name)+" marca a "+sn(s.p.name)+"."}}
+  else if(A.k==="fo"){M.focus=A.v;M.tip="Hecho: la pelota pasa por "+sn(A.v)+"."}
+  M.tipS=null;updLive();
+}
+function tipHTML(){return M.tip?'<div class="tipb"><span>🗣️ '+M.tip+'</span>'+(M.tipA&&M.run?'<button class="primary" onclick="tipDo()">'+M.tipA.l+'</button>':'')+'</div>':""}
+function decBar(){
+  var D=M.dec;if(!D)return "";
+  return '<div class="decbar" role="dialog" aria-label="El asistente te consulta"><div class="in"><div class="row" style="align-items:flex-start"><div style="min-width:0"><p class="muted" style="margin:0;font-size:11px;font-weight:700;letter-spacing:.04em">EL ASISTENTE TE CONSULTA</p><b style="font-size:16px">'+D.t+'</b><p class="muted" style="margin:0;font-size:12.5px">'+D.x+'</p></div><button class="ghost" style="width:auto;min-height:32px;padding:4px 10px" onclick="M.dec=null;M.dk=\'x\';updLive()" aria-label="Cerrar">✕</button></div>'+
+    '<div class="dopts" style="grid-template-columns:repeat('+D.o.length+',1fr)">'+D.o.map(function(o,i){return '<button class="'+(i===0?'primary':'ghost')+'" '+(o.dis?'disabled ':'')+'onclick="decide('+i+')">'+o.l+'</button>'}).join("")+'</div></div></div>';
+}
 </script>
 <script>
 /* ---------- v30: cansancio, cambios y faltas del rival ---------- */
@@ -3687,6 +3699,32 @@ function rotPlan(L,busyC,busyB,max,res){
   return res;
 }
 </script>
+<script>
+/* ---------- v32: el asistente sin bajar la pantalla ---------- */
+function quickHTML(){
+  var pre=M.i===0&&!M.cur,txt="",btn="",go='<button class="ghost" style="font-weight:800" onclick="liveGo()">'+(pre?"▶ Empezar":"▶ Seguir")+'</button>';
+  if(pre){var R=preRec();txt=M.preOk?"✓ Consejos aplicados.":"Estrategia <b>"+strWord(R.st)+"</b>, que <b>"+sn(R.by.name)+"</b> marque a <b>"+sn(R.mk.name)+"</b> y la pelota para <b>"+sn(R.bo.name)+"</b>.";if(!M.preOk)btn='<button class="primary" onclick="applyPre()">✓ Aplicar</button>'}
+  else if(!M.cur&&M.i>0&&M.i<M.n&&!(M.i%(M.n/4))){qtrHTML();var r=M.qrec&&M.qrec.r;txt=M.qok===M.i?"✓ Hecho.":r?r.t:"El plan está funcionando. Seguí así.";if(r&&M.qok!==M.i)btn='<button class="primary" onclick="applyQtr()">✓ Hacerlo</button>'}
+  else txt="Partido en pausa.";
+  if(!btn)go=go.replace('class="ghost"','class="primary"');
+  return '<div class="quick"><p>🗣️ '+txt+'</p><div class="qb'+(btn?'':' one')+'">'+btn+go+'</div></div>';
+}
+</script>
+<style>
+.tipb{display:flex;gap:8px;align-items:center;margin-top:6px;padding:6px 8px 6px 12px;border-radius:12px;background:var(--mine);border:1px solid var(--wood);font-size:13px;line-height:1.3}
+.tipb span{flex:1;min-width:0}
+.tipb button{width:auto;min-height:36px;padding:6px 12px;font-size:14px;flex:none}
+.decbar{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--paper);border-top:3px solid var(--wood);box-shadow:0 -6px 24px rgba(0,0,0,.25);padding:10px max(12px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.decbar .in{max-width:900px;margin:0 auto}
+.dopts{display:grid;gap:6px;margin-top:8px}
+.dopts button{min-height:46px;padding:8px 6px;font-size:14px;text-align:center;font-weight:700;line-height:1.15}
+.quick{margin-top:8px;padding:10px 12px;border-radius:14px;background:var(--mine);border:1.5px solid var(--wood)}
+.quick p{margin:0 0 8px;font-size:14px}
+.qb{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.qb.one{grid-template-columns:1fr}
+.qb button{text-align:center;min-height:46px;padding:10px}
+@media (orientation:landscape) and (max-height:560px){.tipb{margin-top:4px;padding:3px 6px 3px 10px;font-size:12.5px}.tipb button{min-height:30px;padding:3px 10px}.decbar{padding-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom,0px))}.decbar .in{display:flex;gap:12px;align-items:center}.decbar .in>.row{flex:1;min-width:0}.decbar .in>.row p:first-child{display:none}.dopts{margin-top:0;flex:0 0 55%}.dopts button{min-height:40px}}
+</style>
 <script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost"))navigator.serviceWorker.register("sw.js").catch(function(){});</script>
 </body>
 </html>
