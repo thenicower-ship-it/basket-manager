@@ -432,20 +432,198 @@ function newsHTML(res){
 }
 
 /* ---------- Liga ---------- */
+/* ---------- Formatos reales de cada liga (v36) ---------- */
+/* st: fases del playoff. k: r1 primera ronda (q clasificados), nx ganadores vecinos, pi1/pi2 play-in, rc reclasificación, qr cuartos tras la reclasificación. bo: al mejor de */
+var FMT={
+  nba:{rr:"nba",dir:6,pi:4,cut:8,rel:0,st:[{k:"pi1",bo:1,n:"Play-in"},{k:"pi2",bo:1,n:"Play-in (último lugar)"},{k:"r1",q:8,bo:7,n:"Primera ronda"},{k:"nx",bo:7,n:"Semifinales de conferencia"},{k:"nx",bo:7,n:"Finales de conferencia"},{k:"nx",bo:7,n:"Finales NBA"}],
+    txt:"82 partidos. Del 1º al 6º de cada conferencia van directo a playoffs; del 7º al 10º juegan el play-in por los dos últimos lugares. Todas las series, al mejor de 7."},
+  acb:{rr:2,dir:8,cut:8,rel:2,st:[{k:"r1",q:8,bo:3,n:"Cuartos de final"},{k:"nx",bo:5,n:"Semifinales"},{k:"nx",bo:5,n:"Final"}],
+    txt:"Ida y vuelta. Los 8 primeros entran a playoffs: cuartos al mejor de 3, semifinales y final al mejor de 5."},
+  gre:{rr:2,dir:8,cut:8,rel:1,st:[{k:"r1",q:8,bo:3,n:"Cuartos de final"},{k:"nx",bo:3,n:"Semifinales"},{k:"nx",bo:5,n:"Final"}],
+    txt:"Ida y vuelta. Los 8 primeros entran a playoffs: cuartos y semifinales al mejor de 3, final al mejor de 5."},
+  tur:{rr:2,dir:8,cut:8,rel:2,st:[{k:"r1",q:8,bo:3,n:"Cuartos de final"},{k:"nx",bo:5,n:"Semifinales"},{k:"nx",bo:5,n:"Final"}],
+    txt:"Ida y vuelta. Los 8 primeros entran a playoffs: cuartos al mejor de 3, semifinales y final al mejor de 5."},
+  isr:{rr:2,dir:6,pi:4,cut:8,rel:2,st:[{k:"pi1",bo:1,n:"Play-in"},{k:"pi2",bo:1,n:"Play-in (último lugar)"},{k:"r1",q:8,bo:5,n:"Cuartos de final"},{k:"nx",bo:5,n:"Semifinales"},{k:"nx",bo:5,n:"Final"}],
+    txt:"Ida y vuelta. Del 1º al 6º van directo a playoffs; del 7º al 10º juegan el play-in por dos lugares. Series al mejor de 5."},
+  arg:{rr:2,dir:4,pi:8,cut:12,rel:2,st:[{k:"rc",bo:3,n:"Reclasificación"},{k:"qr",bo:5,n:"Cuartos de final"},{k:"nx",bo:5,n:"Semifinales"},{k:"nx",bo:7,n:"Final"}],
+    txt:"Ida y vuelta. Del 1º al 4º van directo a cuartos; del 5º al 12º juegan la reclasificación (al mejor de 3). Cuartos y semifinales al mejor de 5, final al mejor de 7."},
+  bra:{rr:2,dir:16,cut:16,rel:1,st:[{k:"r1",q:16,bo:5,n:"Octavos de final"},{k:"nx",bo:5,n:"Cuartos de final"},{k:"nx",bo:5,n:"Semifinales"},{k:"nx",bo:5,n:"Final"}],
+    txt:"Ida y vuelta. Entran 16 a playoffs (1º contra 16º, y así). Todas las series al mejor de 5. El 17º queda afuera y el 18º está en zona de descenso."},
+  uru:{rr:2,split:6,dir:6,pi:2,cut:8,rel:2,st:[{k:"r1",q:8,bo:5,n:"Cuartos de final"},{k:"nx",bo:5,n:"Semifinales"},{k:"nx",bo:7,n:"Final"}],
+    txt:"Ida y vuelta. Después, los 6 primeros juegan la Ronda Título y del 7º al 12º el Reclasificatorio (otra vez ida y vuelta, sumando lo anterior). Los 2 mejores del Reclasificatorio entran a playoffs. Cuartos y semifinales al mejor de 5, final al mejor de 7."}
+};
+function fmtLegacy(){return {rr:1,dir:8,cut:8,rel:0,old:true,st:LC().stages.map(function(n,i){return {k:i?"nx":"r1",q:8,bo:1,n:n}}),txt:"Una vuelta. Los 8 primeros"+(LC().groups.length>1?" de cada conferencia":"")+" entran a playoffs, a partido único."}}
+function fmtOf(){return S&&S.fv===2&&FMT[S.lg]?FMT[S.lg]:fmtLegacy()}
+function poFmt(){return S.po&&S.po.v===2&&FMT[S.lg]?FMT[S.lg]:fmtLegacy()}
+function poName(i){var st=poFmt().st[i];return st?st.n:""}
+function swapR(r){return r.map(function(p){return [p[1],p[0]]})}
+function rrBye(ids){var a=ids.slice();if(a.length%2)a.push(null);return rrRounds(a).map(function(r){var bye=null,ps=[];r.forEach(function(p){if(p[0]===null)bye=p[1];else if(p[1]===null)bye=p[0];else ps.push(p)});return {r:ps,bye:bye}})}
 function makeSched(){
-  var ids=shuffle(LIDS()),rounds=[],n=ids.length;
-  for(var r=0;r<n-1;r++){
-    var round=[];
-    for(var i=0;i<n/2;i++)round.push([ids[i],ids[n-1-i]]);
-    rounds.push(round);
-    ids.splice(1,0,ids.pop());
+  var F=fmtOf(),a=rrRounds(shuffle(LIDS()));
+  if(F.rr===1)return a;
+  var s=a.concat(shuffle(a.map(swapR)));
+  if(F.rr==="nba"){
+    var rc=LC().groups.map(function(c){return rrBye(shuffle(LIDS().filter(function(i){return TEAMS[i].conf===c})))}),ex=[];
+    for(var k=0;ex.length<24;k++){var j=k%rc[0].length,x=rc[0][j],y=rc[1][j],r=x.r.concat(y.r);if(x.bye&&y.bye)r.push([x.bye,y.bye]);ex.push(k%2?swapR(r):r)}
+    s=shuffle(s.concat(ex));
   }
-  return rounds;
+  if(F.split)for(var i=0;i<2*(F.split-1);i++)s.push([]);
+  return s;
+}
+function splitAt(){var F=fmtOf();return F.split?S.sched.length-2*(F.split-1):-1}
+function fillSplit(){
+  var F=fmtOf();if(!F.split||S.spl)return;
+  var all=sortIds(LIDS()),top=all.slice(0,F.split),bot=all.slice(F.split),at=splitAt();
+  S.spl={top:top,bot:bot};
+  var ra=rrRounds(shuffle(top)),rb=rrRounds(shuffle(bot)),r=[];
+  ra.forEach(function(x,i){r.push(x.concat(rb[i]))});
+  r=r.concat(r.map(swapR));
+  r.forEach(function(x,i){S.sched[at+i]=x});
+  addNews("Terminó la primera fase. "+(top.indexOf(S.my)>=0?"Tu equipo juega la Ronda Título.":"Tu equipo juega el Reclasificatorio: hay que terminar entre los 2 primeros para entrar a playoffs."),"dir");
+}
+function schedFix(){if(S.sched&&S.sched[S.rnd]&&!S.sched[S.rnd].length)fillSplit()}
+/* tabla en orden (con Ronda Título / Reclasificatorio cuando hay) */
+function tblIds(c){if(S.spl)return sortIds(S.spl.top).concat(sortIds(S.spl.bot));return sortIds(confIds(c))}
+function tblAll(){return LC().groups.length>1?sortIds(LIDS()):tblIds(LC().groups[0])}
+function relZone(id){var F=fmtOf();if(!F.rel)return false;var t=tblIds(TEAMS[id].conf);return t.indexOf(id)>=t.length-F.rel}
+
+/* ---------- Series de playoffs ---------- */
+var SERH={1:[1],3:[1,0,1],5:[1,1,0,0,1],7:[1,1,0,0,1,0,1]};
+function serHome(g){var P=SERH[g.bo||1]||[1];return P[(g.r||[]).length]!==0}
+function serAdd(g,sa,sb){
+  g.r=g.r||[];g.r.push([sa,sb]);g.sa=sa;g.sb=sb;
+  if(sa>sb)g.wa=(g.wa||0)+1;else g.wb=(g.wb||0)+1;
+  var need=Math.floor((g.bo||1)/2)+1;
+  if(g.wa>=need)g.w=g.a;else if(g.wb>=need)g.w=g.b;
+}
+function serBetter(x,y){var sd=S.po.sd||{},a=sd[x]||99,b=sd[y]||99;if(a!==b)return a<b;var p=S.st[x],q=S.st[y];return p&&q?p.w>=q.w:true}
+function serPair(x,y,bo,c){if(!x||!y)return null;var ab=serBetter(x,y)?[x,y]:[y,x];return {a:ab[0],b:ab[1],w:null,bo:bo,wa:0,wb:0,r:[],c:c}}
+function poSeeds(c){var F=fmtOf();if(F.split&&S.spl)return sortIds(S.spl.top).concat(sortIds(S.spl.bot).slice(0,F.pi||2));return sortIds(confIds(c))}
+function startPO(){
+  S.phase="po";
+  var sd={},seeds={},v2=S.fv===2&&!!FMT[S.lg];
+  LC().groups.forEach(function(c){seeds[c]=poSeeds(c);seeds[c].forEach(function(id,i){sd[id]=i+1})});
+  S.po={v:v2?2:1,stage:-1,games:[],hist:[],seeds:seeds,sd:sd,q:{}};S.poWins=0;S.poRep=0;S.madePO=false;
+  var F=poFmt(),k0=F.st[0].k;if((k0==="pi1"||k0==="rc")&&(sd[S.my]||99)<=F.dir)S.madePO=true;
+  poNext();
+}
+function poNext(){
+  var po=S.po,F=poFmt(),i=po.stage+1,st=F.st[i],prev=po.games||[],g=[];
+  if(!po.hist)po.hist=[];
+  if(prev.length)po.hist.push(prev);
+  if(st.k==="nx"){for(var j=0;j+1<prev.length;j+=2)g.push(serPair(prev[j].w,prev[j+1].w,st.bo,prev[j].c===prev[j+1].c?prev[j].c:null))}
+  else LC().groups.forEach(function(c){
+    var s=po.seeds[c],pg=prev.filter(function(x){return x.c===c}),d=F.dir;
+    if(st.k==="pi1"){g.push(serPair(s[d],s[d+1],1,c));g.push(serPair(s[d+2],s[d+3],1,c))}
+    else if(st.k==="pi2"){g.push(serPair(pg[0].w===pg[0].a?pg[0].b:pg[0].a,pg[1].w,1,c));po.q[c]=s.slice(0,d).concat([pg[0].w])}
+    else if(st.k==="rc"){for(var k=0;k<4;k++)g.push(serPair(s[d+k],s[d+7-k],st.bo,c))}
+    else if(st.k==="qr"){[[0,3],[3,0],[1,2],[2,1]].forEach(function(p){g.push(serPair(s[p[0]],pg[p[1]]&&pg[p[1]].w,st.bo,c))})}
+    else{
+      var q=po.q[c]?po.q[c].concat(pg.length?[pg[0].w]:[]):s.slice(0,st.q);
+      var P=st.q===16?[[0,15],[7,8],[3,12],[4,11],[2,13],[5,10],[1,14],[6,9]]:[[0,7],[3,4],[2,5],[1,6]];
+      P.forEach(function(p){g.push(serPair(q[p[0]],q[p[1]],st.bo,c))});
+    }
+  });
+  g=g.filter(function(x){return x});
+  po.stage=i;po.games=g;
+  if(st.k!=="pi1"&&st.k!=="pi2"&&g.some(function(x){return x.a===S.my||x.b===S.my}))S.madePO=true;
+}
+function poStageDone(){return S.po.games.every(function(g){return g.w!=null})}
+function poDay(){
+  var po=S.po;
+  po.games.forEach(function(g){if(g.w==null&&g.a!==S.my&&g.b!==S.my){var r=simGame(g.a,g.b);serAdd(g,r[0],r[1]);tire(g.a);tire(g.b)}});
+  tickInj();po.games.forEach(function(g){if(g.w==null){rollInj(g.a,0.006);rollInj(g.b,0.006)}});refreshStr();
+}
+function poAdvance(){
+  if(S.phase!=="po"||!poStageDone())return;
+  if(S.po.stage>=poFmt().st.length-1){S.champ=S.po.games[0].w;startWC();return}
+  poNext();
+}
+function progressPO(){poDay();poAdvance()}
+function myOppPO(){
+  if(!S.po||!S.po.games)return null;
+  var g=S.po.games.filter(function(g){return g.w==null&&(g.a===S.my||g.b===S.my)})[0];
+  return g?(g.a===S.my?g.b:g.a):null;
+}
+function mySer(){return S.po&&S.po.games?S.po.games.filter(function(g){return g.w==null&&(g.a===S.my||g.b===S.my)})[0]:null}
+function poWaiting(){if(!S.po||!S.madePO||myOppPO())return false;var st=poFmt().st[S.po.stage];return !!st&&(st.k==="pi1"||st.k==="pi2"||st.k==="rc")}
+function simRestPO(){
+  var guard=0;
+  while(S.phase==="po"&&!myOppPO()&&guard++<400)progressPO();
+  save();showHub();
+}
+function serScore(g){var me=g.b===S.my;return me?[g.wb||0,g.wa||0]:[g.wa||0,g.wb||0]}
+function serNote(g){
+  var s=serScore(g),w=s[0],l=s[1];
+  if(S.champ===S.my)return "¡Son los campeones de la "+LC().name+"!"+((g.bo||1)>1?" Serie ganada "+w+"-"+l+".":"");
+  if((g.bo||1)===1){if(g.w===S.my)return "Pasás a la siguiente ronda.";return myOppPO()?"Perdiste, pero tenés una última chance en el play-in.":"Quedaste eliminado de los playoffs."}
+  if(g.w===S.my)return "¡Ganaste la serie "+w+"-"+l+"! Pasás a la siguiente ronda.";
+  if(g.w!=null)return "Perdiste la serie "+w+"-"+l+". Quedaste eliminado de los playoffs.";
+  return (w>l?"Vas ganando la serie "+w+"-"+l:w<l?"Vas perdiendo la serie "+w+"-"+l:"La serie está empatada "+w+"-"+l)+" (al mejor de "+g.bo+").";
+}
+function poGate(){
+  fyFix();var K=finK(),R=S.sched.length||1,F=S.fy,f=fillOf(),g=0.38*K/(R/2)*f*TIX[S.tix||"n"].m*1.3;
+  F.home++;F.fill=Math.round(f*100);F.gate+=g;S.tb[S.my]=r1((S.tb[S.my]||0)+g);
+}
+function commitPO(pa,pb,opp){/* devuelve nota y si fue de local */
+  var g=mySer(),mineA=g.a===S.my,hm=serHome(g)===mineA,guard=0;
+  serAdd(g,mineA?pa:pb,mineA?pb:pa);tire(g.a);tire(g.b);
+  if(hm)poGate();
+  poDay();
+  if(g.w!=null){var sk=poFmt().st[S.po.stage]||{};if(g.w===S.my&&sk.k!=="pi1"&&sk.k!=="pi2"){S.poWins++;if(S.poRep==null)S.poRep=(S.poWins-1)*4;S.poRep+=(sk.k==="rc"||sk.q===16?2:4)}while(!poStageDone()&&guard++<20)poDay()}
+  poAdvance();
+  return {note:serNote(g),hm:hm};
+}
+function serLine(g){
+  var mine=g.a===S.my||g.b===S.my,bo=g.bo||1,res;
+  if(bo===1)res=g.w==null?'<span class="muted">pendiente</span>':'<span>'+g.sa+' - '+g.sb+'</span>';
+  else res='<span>'+(g.w!=null?'<b>':'')+(g.wa||0)+' - '+(g.wb||0)+(g.w!=null?'</b>':'')+'</span>';
+  return '<div class="gm'+(mine?' mine':'')+'"><span>'+TEAMS[g.a].name+' vs '+TEAMS[g.b].name+'</span>'+res+'</div>';
+}
+function simSeries(opp){
+  var g=mySer();if(!g)return;
+  var guard=0,res=[],k0=(g.r||[]).length;
+  while(S.phase==="po"&&mySer()===g&&guard++<8){var o=myOppPO(),r=simGame(S.my,o,curCx());var x=commitMine(r[0],r[1],o);res.push(x)}
+  var last=res[res.length-1]||{};
+  $('<h1>Serie simulada</h1><div class="card">'+res.map(function(x,i){return '<div class="gm"><span>Partido '+(k0+i+1)+(x.hm===false?' (visitante)':x.hm?' (local)':'')+'</span><b class="'+(x.win?"win":"lose")+'">'+x.pa+' - '+x.pb+'</b></div>'}).join("")+'</div>'+
+    '<p>'+(last.note||"")+'</p><button class="primary" onclick="showHub()">Continuar</button>');
+}
+
+/* ---------- Simular varias fechas ---------- */
+function injPending(){return (S.injq||[]).some(function(x){return S.inj[x.n]>0&&TEAMS[S.my].pl.some(function(p){return p.name===x.n})})}
+function showSimMenu(){
+  var h='<h1>Simular varias fechas</h1><p class="muted">Se juegan al instante todos tus partidos (liga y copas) hasta donde elijas. Los lesionados hacen la recuperación normal y las ofertas por tus jugadores que lleguen en el medio se dejan pasar.</p>';
+  var opts=[["n5","5 partidos"],["n10","10 partidos"]];
+  if(S.rnd<deadline())opts.push(["mkt","Hasta el cierre del mercado (fecha "+deadline()+")"]);
+  opts.push(["cup","Hasta el próximo partido de copa"]);
+  opts.push(["end","Hasta el final de la fase regular"]);
+  h+=opts.map(function(o){return '<button class="opt" onclick="simUntil(\''+o[0]+'\')"><b>'+o[1]+'</b></button>'}).join("");
+  $(h+'<button class="ghost" style="margin-top:8px" onclick="showHub()">Volver</button>');
+}
+function simUntil(k){
+  var n=0,w=0,l=0,g=0,lim=k==="n5"?5:k==="n10"?10:9999,why="",cup=0,inj=[],nof=0,seen={};
+  while(S.phase==="reg"&&g++<500){
+    schedFix();
+    var ev=S.evt?curEv():null,cupEv=ev&&ev.t!=="L",opp=cupEv?cupMyOpp(ev):myOppReg();
+    if(!opp){advanceAuto();if(S.phase!=="reg")break;ev=S.evt?curEv():null;cupEv=ev&&ev.t!=="L";opp=cupEv?cupMyOpp(ev):myOppReg();if(!opp)break}
+    if(n>=lim)break;
+    if(k==="cup"&&cupEv&&n>0){why="Sigue un partido de "+CUPS[ev.c].name+".";break}
+    if(k==="mkt"&&!cupEv&&S.rnd>=deadline()){why="Es la última fecha con el mercado abierto.";break}
+    if(injPending())S.injq.forEach(function(q){if(S.inj[q.n]>0)inj.push(q.n+" ("+S.inj[q.n]+(S.inj[q.n]===1?" partido)":" partidos)"))});S.injq=[];
+    (S.offs||[]).forEach(function(o){var kk=o.n+o.t+o.r;if(!seen[kk]){seen[kk]=1;nof++}});
+    var r=simGame(S.my,opp,curCx()),x=commitMine(r[0],r[1],opp);n++;if(cupEv)cup++;if(x.win)w++;else l++;
+  }
+  save();
+  var st=S.st[S.my],cr=tblIds(TEAMS[S.my].conf).indexOf(S.my)+1;
+  $('<h1>Fechas simuladas</h1><div class="card"><p>Jugaste <b>'+n+'</b> '+(n===1?'partido':'partidos')+(cup?' ('+cup+' de copa)':'')+': <span class="win">'+w+' ganados</span> y <span class="lose">'+l+' perdidos</span>.</p>'+
+    '<p>En la liga: '+st.w+' - '+st.l+', puesto '+cr+' '+confPhrase(TEAMS[S.my].conf)+'.</p>'+(inj.length?'<p class="muted">Lesionados en el camino: '+inj.join(", ")+'.</p>':'')+(nof?'<p class="muted">Llegaron '+nof+(nof===1?' oferta':' ofertas')+' por tus jugadores en el medio.</p>':'')+(why?'<p class="muted">'+why+'</p>':'')+
+    (S.phase==="po"?'<p><b>Terminó la fase regular.</b> '+(S.madePO||myOppPO()?'¡Tu equipo juega los playoffs!':'No clasificaste a los playoffs.')+'</p>':'')+'</div>'+
+    '<button class="primary" onclick="showHub()">Continuar</button>');
 }
 function newSeason(){
   S.rnd=0;S.phase="reg";S.inj={};S.st={};
   LIDS().forEach(function(id){S.st[id]={w:0,l:0,pf:0,pa:0}});
-  S.sched=makeSched();S.po=null;S.poWins=0;S.madePO=false;S.champ=null;S.fin=null;
+  S.fv=2;S.spl=null;S.sched=makeSched();S.po=null;S.poWins=0;S.madePO=false;S.champ=null;S.fin=null;
   buildAllCups();S.evt=buildEvents();S.ei=0;
   S.ps={};S.strk=0;S.wc=null;S.rush={};S.injq=[];S.en={};S.rest={};tbInit();morSeason();stInit();genYouth();boardStart();
 }
@@ -482,53 +660,20 @@ function simOthers(){
   });
 }
 function myOppReg(){
-  var r=S.sched[S.rnd];
+  schedFix();var r=S.sched[S.rnd];
   for(var i=0;i<r.length;i++){
     if(r[i][0]===S.my)return r[i][1];
     if(r[i][1]===S.my)return r[i][0];
   }
   return null;
 }
-function myOppPO(){
-  var g=S.po.games.filter(function(g){return g.w==null&&(g.a===S.my||g.b===S.my)})[0];
-  return g?(g.a===S.my?g.b:g.a):null;
-}
-function startPO(){
-  S.phase="po";
-  var g=[];
-  LC().groups.forEach(function(c){
-    var s=sortIds(confIds(c)).slice(0,8);
-    [[0,7],[3,4],[2,5],[1,6]].forEach(function(p){g.push({a:s[p[0]],b:s[p[1]],w:null})});
-  });
-  S.po={stage:0,games:g};S.poWins=0;
-  S.madePO=g.some(function(x){return x.a===S.my||x.b===S.my});
-}
-function progressPO(){
-  var po=S.po;
-  po.games.forEach(function(g){
-    if(g.w==null&&g.a!==S.my&&g.b!==S.my){
-      var r=simGame(g.a,g.b);g.sa=r[0];g.sb=r[1];g.w=r[0]>r[1]?g.a:g.b;tire(g.a);tire(g.b);
-    }
-  });
-  if(!po.games.every(function(g){return g.w!=null}))return;
-  var ws=po.games.map(function(g){return g.w});
-  if(po.stage===LC().stages.length-1){S.champ=ws[0];startWC();return}
-  var ng=[];
-  for(var i=0;i<ws.length;i+=2)ng.push({a:ws[i],b:ws[i+1],w:null});
-  tickInj();ws.forEach(function(id){rollInj(id,0.008)});refreshStr();
-  po.stage++;po.games=ng;
-}
-function simRestPO(){
-  var guard=0;
-  while(S.phase==="po"&&!myOppPO()&&guard++<10)progressPO();
-  save();showHub();
-}
 function finishSeason(){
   S.phase="end";
-  var all=sortIds(LIDS()),act=all.indexOf(S.my)+1,exp=RANKL[S.my];
+  var all=tblAll(),act=all.indexOf(S.my)+1,exp=RANKL[S.my];
   var d=clamp(Math.round((exp-act)*0.8),-12,12);
+  if(relZone(S.my)){d-=6;addNews("Tu equipo terminó en zona de descenso. La directiva está furiosa: se salvó porque no hay segunda división, pero tu puesto corre peligro.","dir")}
   if(S.madePO)d+=3;
-  d+=S.poWins*4;
+  d+=S.poRep!=null?S.poRep:S.poWins*4;
   if(S.champ===S.my)d+=8;
   if(!S.madePO&&exp<=Math.round(all.length*0.4))d-=4;
   var cups=[];
@@ -572,18 +717,13 @@ function commitMine0(pa,pb,opp){
     streak(pa>pb);
     if(S.rnd<deadline()&&Math.random()<(euroMkt()?0.25:0.1)){if(euroMkt())aiTransfer();else aiTrade()}
     if(S.rnd<deadline())makeOffer();
-    S.rnd++;boardMid();if(S.rnd===deadline())trainMid();
+    S.rnd++;schedFix();boardMid();if(S.rnd===deadline())trainMid();
     if(S.evt){S.ei++;advanceAuto()}else if(S.rnd>=S.sched.length)startPO();
   }else{
-    var g=S.po.games.filter(function(g){return g.w==null&&(g.a===S.my||g.b===S.my)})[0];
-    var mineA=g.a===S.my;
-    g.sa=mineA?pa:pb;g.sb=mineA?pb:pa;tire(g.a);tire(g.b);
-    g.w=pa>pb?S.my:opp;
-    if(pa>pb)S.poWins++;
-    progressPO();
+    var cp=commitPO(pa,pb,opp);
   }
   save();
-  return {ctx:ctx,opp:opp,pa:pa,pb:pb,win:pa>pb,news:NEWS.slice()};
+  return {ctx:ctx,opp:opp,pa:pa,pb:pb,win:pa>pb,news:NEWS.slice(),note:cp&&cp.note,hm:cp&&cp.hm};
 }
 
 
@@ -750,14 +890,14 @@ function showHub(){
   if(!S||!S.my){showSelect();return}
   if(S.phase==="end"){showEnd();return}
   var t=TEAMS[S.my],st=S.st[S.my];
-  var cr=sortIds(confIds(t.conf)).indexOf(S.my)+1;
+  var cr=tblIds(t.conf).indexOf(S.my)+1;
   var h='<h1>'+t.name+'</h1><p class="muted">Temporada '+S.season+' · '+confName(t.conf)+' · reputación '+S.rep+'/100</p>';
   var opp,head,tag="";
   var ev=S.phase==="reg"&&S.evt?curEv():null,cupEv=ev&&ev.t!=="L";
   if(S.phase==="reg"){
     opp=cupEv?cupMyOpp(ev):myOppReg();
     if(!opp){advanceAuto();save();showHub();return}
-    head=cupEv?evLabel(ev):"Fecha "+(S.rnd+1)+" de "+S.sched.length;
+    head=cupEv?evLabel(ev):"Fecha "+(S.rnd+1)+" de "+S.sched.length+(S.spl?" · "+(S.spl.top.indexOf(S.my)>=0?"Ronda Título":"Reclasificatorio"):"");
     h+='<div class="card"><div class="row"><div><div class="big">'+st.w+' - '+st.l+'</div><div class="muted">Puesto '+cr+' '+confPhrase(t.conf)+'</div></div><span class="pill">'+head+'</span></div>'+
        '<div class="progress"><i style="width:'+Math.round(S.rnd/S.sched.length*100)+'%"></i></div></div>';
   }else if(S.phase==="wc"){
@@ -768,9 +908,11 @@ function showHub(){
        '<p class="muted" style="margin-top:6px">Los mejores clubes del mundo, a partido único. Ser campeón da 10 de reputación.</p></div>';
   }else{
     opp=myOppPO();
-    head=LC().stages[S.po.stage];
+    head=poName(S.po.stage);
+    var ms=mySer(),mbo=ms?ms.bo||1:(S.po.games[0]&&S.po.games[0].bo)||1,mss=ms?serScore(ms):null;
     h+='<div class="card"><div class="row"><div class="big">Playoffs</div><span class="pill">'+head+'</span></div>'+
-       '<p class="muted" style="margin-top:6px">Un solo partido por ronda. Si perdés, quedás afuera.</p></div>';
+       '<p class="muted" style="margin-top:6px">'+(mbo===1?'A partido único: si perdés, quedás afuera.':'Serie al mejor de '+mbo+': gana el primero que llega a '+(Math.floor(mbo/2)+1)+' victorias.')+'</p>'+
+       (ms&&mbo>1?'<div class="row" style="margin-top:6px"><span>Serie contra '+TEAMS[myOppPO()].name+'</span><b class="big">'+mss[0]+' - '+mss[1]+'</b></div><p class="muted">Partido '+((ms.r||[]).length+1)+(serHome(ms)===(ms.a===S.my)?' · de local':' · de visitante')+'</p>':'')+'</div>';
   }
   h+=injCard()+offersHTML();
   var il=injList(S.my);
@@ -791,20 +933,21 @@ function showHub(){
        '<label><input type="radio" name="spd" value="r" '+(S.spd==="r"?"checked":"")+' onchange="setSpd(\'r\')"><b>Rápida</b><span class="muted">El partido corre solo · unos 2 min</span></label>'+
        '</div></div>'+
        '<button class="primary" onclick="playGame(\''+opp+'\')">Jugar el partido</button>'+
-       '<button class="ghost" style="margin-top:8px" onclick="simMine(\''+opp+'\')">Simular el partido al instante</button>';
+       '<button class="ghost" style="margin-top:8px" onclick="simMine(\''+opp+'\')">Simular el partido al instante</button>'+
+       (S.phase==="reg"?'<button class="ghost" style="margin-top:8px" onclick="showSimMenu()">Simular varias fechas…</button>':'')+
+       (S.phase==="po"&&mySer()&&(mySer().bo||1)>1?'<button class="ghost" style="margin-top:8px" onclick="simSeries()">Simular lo que queda de la serie</button>':'');
   }else{
-    h+='<div class="card"><p>'+(S.madePO?"Tu equipo ya quedó eliminado.":"No clasificaste a los playoffs.")+' Se simula el resto del torneo.</p></div>'+
+    if(S.phase==="po"&&poWaiting())h+='<div class="card"><p>Tu equipo ya está clasificado. Ahora se juega '+(poFmt().st[S.po.stage].k==="rc"?'la reclasificación':'el play-in')+' y después te toca a vos.</p></div>'+
+       '<button class="primary" onclick="simRestPO()">Simular '+(poFmt().st[S.po.stage].k==="rc"?'la reclasificación':'el play-in')+'</button>';
+    else h+='<div class="card"><p>'+(S.madePO?"Tu equipo ya quedó eliminado.":"No clasificaste a los playoffs.")+' Se simula el resto del torneo.</p></div>'+
        '<button class="primary" onclick="simRestPO()">Simular el resto de los playoffs</button>';
   }
   if(S.phase==="wc")h+=wcGamesHTML();
   if(S.phase==="po"){
     h+='<div class="card"><h2>'+head+'</h2>';
-    S.po.games.forEach(function(g){
-      var mine=g.a===S.my||g.b===S.my;
-      var res=g.w==null?'<span class="muted">pendiente</span>':'<span>'+g.sa+' - '+g.sb+'</span>';
-      h+='<div class="gm'+(mine?' mine':'')+'"><span>'+TEAMS[g.a].name+' vs '+TEAMS[g.b].name+'</span>'+res+'</div>';
-    });
+    S.po.games.forEach(function(g){h+=serLine(g)});
     h+='</div>';
+    (S.po.hist||[]).slice().reverse().forEach(function(gs,k){var si=S.po.hist.length-1-k;h+='<details class="card"><summary><b>'+poName(si)+'</b></summary>'+gs.map(serLine).join("")+'</details>'});
   }
   h+=newsCard();
   h+='<div class="three"><button class="ghost" onclick="showTable(\''+t.conf+'\')">Tabla</button><button class="ghost" onclick="showRoster()">Plantilla</button><button class="ghost" onclick="showMarket()">Mercado</button></div>'+
@@ -819,16 +962,25 @@ function resetAll(){
   S={my:null,rep:50,mode:12,season:1,inj:{},tag:{},rt:{},own:{},sal:{},bud:{},fict:{}};initLeague();showSelect();
 }
 function showTable(c){
-  var multi=LC().groups.length>1;
-  var ids=sortIds(confIds(c)),h='<h1>Tabla de posiciones</h1>';
+  var multi=LC().groups.length>1,F=fmtOf();
+  var h='<h1>Tabla de posiciones</h1>';
   if(multi)h+='<div class="two"><button class="ghost tab'+(c==="E"?" on":"")+'" onclick="showTable(\'E\')">Este</button><button class="ghost tab'+(c==="W"?" on":"")+'" onclick="showTable(\'W\')">Oeste</button></div>';
   else h+='<p class="muted">'+LC().name+'</p>';
-  h+='<div class="card" style="padding:8px">';
-  ids.forEach(function(id,i){
-    var s=S.st[id],d=s.pf-s.pa;
-    h+='<div class="tr'+(id===S.my?' mine':'')+(i===7?' cut':'')+'"><span>'+(i+1)+'</span><span class="nm">'+TEAMS[id].name+'</span><b>'+s.w+'-'+s.l+'</b><span class="d">'+(d>0?"+":"")+d+'</span></div>';
-  });
-  h+='</div><p class="muted">'+(multi?'Los 8 primeros de cada conferencia entran a playoffs.':'Los 8 primeros entran a playoffs.')+'</p><button class="primary" onclick="showHub()">Volver</button>';
+  var row=function(id,i,n,cut,pz,rz){var s=S.st[id],d=s.pf-s.pa;return '<div class="tr'+(id===S.my?' mine':'')+(cut?' cut':'')+'"'+(rz?' style="opacity:.6"':'')+'><span'+(pz?' style="color:var(--led)"':rz?' class="lose"':'')+'>'+(i+1)+'</span><span class="nm">'+TEAMS[id].name+'</span><b>'+s.w+'-'+s.l+'</b><span class="d">'+(d>0?"+":"")+d+'</span></div>'};
+  if(S.spl){
+    [["Ronda Título",sortIds(S.spl.top),0],["Reclasificatorio",sortIds(S.spl.bot),S.spl.top.length]].forEach(function(G){
+      h+='<div class="card" style="padding:8px"><h2 style="margin:4px 8px 8px">'+G[0]+'</h2>';
+      G[1].forEach(function(id,k){var i=G[2]+k,n=S.spl.top.length+S.spl.bot.length;h+=row(id,i,n,G[2]&&k===(F.pi||2)-1,G[2]&&k<(F.pi||2),F.rel&&i>=n-F.rel)});
+      h+='</div>';
+    });
+  }else{
+    var ids=sortIds(confIds(c)),n=ids.length;
+    h+='<div class="card" style="padding:8px">';
+    ids.forEach(function(id,i){h+=row(id,i,n,i===F.dir-1||(F.pi&&!F.split&&i===F.dir+F.pi-1)||(F.rel&&i===n-F.rel-1),F.pi&&!F.split&&i>=F.dir&&i<F.dir+F.pi,F.rel&&i>=n-F.rel)});
+    h+='</div>';
+  }
+  var ph=S.sched?S.sched.length:0;
+  h+='<p class="muted">'+F.txt+(F.rel?' Los '+(F.rel>1?F.rel+' últimos':'último')+' (en rojo) quedan en zona de descenso: no hay segunda división, pero la directiva lo castiga fuerte.':'')+(F.pi&&!F.split?' En amarillo, la zona de '+(F.st[0].k==="rc"?'reclasificación':'play-in')+'.':'')+' Temporada regular: '+ph+' fechas.</p><button class="primary" onclick="showHub()">Volver</button>';
   $(h);
 }
 function showRoster(msg){
@@ -1243,10 +1395,11 @@ function resultNote(res){
     return res.ev.n===2?"¡Son los campeones de la "+nm+"!":"Pasás a la siguiente ronda de la "+nm+".";
   }
   if(res.ctx==="reg"){
-    if(S.phase==="po")return "Terminó la temporada regular. "+(S.madePO?"¡Clasificaste a los playoffs!":"No clasificaste a los playoffs.");
-    var s=S.st[S.my],cr=sortIds(confIds(TEAMS[S.my].conf)).indexOf(S.my)+1;
+    if(S.phase==="po")return "Terminó la temporada regular. "+(S.madePO?"¡Clasificaste a los playoffs!":myOppPO()?"Jugás el play-in por un lugar en los playoffs.":"No clasificaste a los playoffs.");
+    var s=S.st[S.my],cr=tblIds(TEAMS[S.my].conf).indexOf(S.my)+1;
     return "Récord "+s.w+" - "+s.l+" · puesto "+cr+" "+confPhrase(TEAMS[S.my].conf)+".";
   }
+  if(res.note)return res.note;
   if(!res.win)return "Quedaste eliminado de los playoffs.";
   return S.phase==="end"?"¡Son los campeones de la "+LC().name+"!":"Pasás a la siguiente ronda.";
 }
@@ -1413,7 +1566,7 @@ function streak(win){
 }
 function boardStart(){
   if(!S.my||!RANKL[S.my])return;
-  var e=RANKL[S.my],n=LSIZE[S.lg],cut=Math.round(LC().groups.length*8*0.85),t;
+  var e=RANKL[S.my],n=LSIZE[S.lg],cut=Math.round(LC().groups.length*fmtOf().cut*0.85),t;
   if(e<=Math.max(2,Math.round(n*0.15)))t="La directiva quiere pelear el título.";
   else if(e<=cut)t="La directiva espera que entres a los playoffs.";
   else t="La directiva sabe que es un año difícil: pide competir y hacer crecer al equipo.";
@@ -3413,7 +3566,7 @@ function showSave(msg){
   PRECODE="";if(navigator.share&&S&&S.my){packState().then(function(c){PRECODE=c})}
 }
 /* El iPhone solo abre Compartir si se llama apenas se toca el botón: el código se arma antes, al abrir la pantalla */
-var PRECODE="",GAMEVER="35";
+var PRECODE="",GAMEVER="36";
 function shareCode(){
   if(!PRECODE){exportCode();return}
   navigator.share({title:"Partida Basket Manager",text:PRECODE}).then(function(){toast("Código enviado ✓")},function(e){if(!e||e.name!=="AbortError")exportCode()});
