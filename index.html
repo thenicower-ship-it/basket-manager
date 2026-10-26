@@ -464,6 +464,8 @@ function simGame(a,b,cx){
   if(cx&&cx.adj){var xa=cx.adj[a]||0,xb=cx.adj[b]||0;A={o:A.o+xa,d:A.d+xa};B={o:B.o+xb,d:B.d+xb}}
   var P=cx?cx.P:LC().pts,pa=Math.round(P+(A.o-B.d-lg)*0.9*P/110+randn()*9*P/110);
   var pb=Math.round(P+(B.o-A.d-lg)*0.9*P/110+randn()*9*P/110);
+  var k=0,f=5/48;
+  while(pa===pb&&k<4){k++;pa+=Math.round(P*f+(A.o-B.d-lg)*0.9*P/110*f+randn()*3*P/110);pb+=Math.round(P*f+(B.o-A.d-lg)*0.9*P/110*f+randn()*3*P/110)}
   if(pa===pb){if(Math.random()<0.5)pa++;else pb++}
   return [pa,pb];
 }
@@ -1338,7 +1340,7 @@ function segment(strat,N){
   return {my:my,op:op,os:os};
 }
 function fatigue(strat){
-  var sc=12/M.n;
+  var sc=12/M.n*(M.i>=M.n?5/6:1);
   var cost=(COST+(strat==="atk"?2:strat==="tri"?1:0))*sc;
   court().forEach(function(p){p.en=Math.max(5,p.en-cost-rnd(-1,2));p.mn=(p.mn||0)+sc});
   M.oppEn=Math.max(30,M.oppEn-cost*OPP_TIRE);
@@ -2575,7 +2577,7 @@ function segment(strat,N){
   return {my:my,op:op,os:os};
 }
 function fatigue(strat){
-  var sc=12/M.n;
+  var sc=12/M.n*(M.i>=M.n?5/6:1);
   var cost=(COST+(strat==="atk"?2:strat==="tri"?1:0))*sc;
   court().forEach(function(p){p.en=Math.max(5,p.en-cost-rnd(-1,2)-(p.name===M.focus?1.5*sc:0));p.mn=(p.mn||0)+sc});
   if(M.opp.pl[0].en!=null){var oc=(COST+(M.oso==="atk"?2:M.oso==="tri"?1:0))*sc;
@@ -2590,7 +2592,7 @@ var LT=null;
 function play(strat){if(strat)M.strat=strat;liveGo()}
 function liveSteps(){return S.spd==="r"?15:30}
 function liveGo(){
-  if(!M||M.done||M.i>=M.n)return;
+  if(!M||M.done||M.i>=mEnd())return;
   sndCtx();
   M.run=true;
   if(!M.cur)newTramo();
@@ -2599,7 +2601,7 @@ function liveGo(){
 }
 function liveStop(){clearTimeout(LT);if(!M||!M.run)return;M.run=false;M.event="Partido en pausa.";showMoment()}
 function newTramo(){
-  var N=Math.floor((M.cx?M.cx.poss:LC().poss)/M.n+Math.random());
+  var N=Math.floor((M.cx?M.cx.poss:LC().poss)*(M.i>=M.n?2.5/48:1/M.n)+Math.random());
   var snap={};M.roster.forEach(function(p){snap[p.name]=[p.pts,p.reb,p.ast,p.pf]});
   M.roster.concat(M.opp.pl).forEach(function(p){var d={};STF.forEach(function(k){d[k]=p[k]||0});p.d=d});
   var r=segment(M.strat,N);
@@ -2612,7 +2614,7 @@ function liveTick(){
   var f=c.t/steps;
   while(c.k<c.lines.length&&c.lines[c.k].f<=f)showLine(c.lines[c.k++]);
   while(c.j<c.sev.length&&c.sev[c.j].f<=f){var e=c.sev[c.j++];e.p.d[e.k]+=e.v}
-  M.gt=(M.i+Math.min(1,f))*48/M.n;
+  M.gt=gTime(M.i+Math.min(1,f));
   if(c.t>=steps){endTramo();return}
   updLive();
   LT=setTimeout(liveTick,500);
@@ -2622,12 +2624,12 @@ function endTramo(){
   while(c.k<c.lines.length)showLine(c.lines[c.k++]);
   M.dMe=M.me;M.dOp=M.op;
   fatigue(c.st);
-  M.i++;M.gt=M.i*48/M.n;
+  M.i++;M.gt=gTime(M.i);
   M.event=describe(c.r);
-  if(M.i>=M.n||M.i%(M.n/4)===0)sndPlay("buzz");
-  if(M.i>=M.n){
+  if(M.i>=mEnd()||(M.i<M.n&&M.i%(M.n/4)===0))sndPlay("buzz");
+  if(M.i>=mEnd()){
     M.run=false;clearTimeout(LT);M.event="Terminó el partido.";
-    if(Math.abs(M.me-M.op)<=3&&!M.used.last){M.used.last=1;lastPoss();return}
+    if(Math.abs(M.me-M.op)<=3&&!M.used["last"+M.ot]){M.used["last"+M.ot]=1;lastPoss();return}
     endReg();return;
   }
   var t3s=0;M.opp.pl.forEach(function(p){t3s+=p.t3m||0});(M.t3h=M.t3h||[]).push(t3s);
@@ -2637,7 +2639,7 @@ function endTramo(){
   if(M.dec&&M.dec.at==null)M.dec.at=M.i;
   M.tip=assistTip();
   var qn=M.n/4;
-  if(M.i%qn===0){
+  if(M.i<M.n&&M.i%qn===0){
     (M.qs=M.qs||[]).push({me:M.me,op:M.op});M.qrec=null;
     M.run=false;clearTimeout(LT);
     var q=M.i/qn;
@@ -2650,7 +2652,7 @@ function endTramo(){
 }
 function gameClock(){
   var e=M.gt||M.i*48/M.n,q=Math.min(4,Math.floor(e/12+1e-9)+1),left=Math.max(0,12-(e-(q-1)*12));
-  if(e>=48)return "Final";
+  if(e>=48){var k=Math.floor((e-48)/5+1e-9)+1;if(!M.ot||k>M.ot||M.done)return "Final";var lo=Math.max(0,5-(e-48-(k-1)*5)),mm=Math.floor(lo+1e-9),ss=Math.round((lo-mm)*60);if(ss===60){mm++;ss=0}return "Prórroga"+(M.ot>1?" "+k:"")+" · "+mm+":"+(ss<10?"0":"")+ss}
   var m=Math.floor(left+1e-9),sg=Math.round((left-m)*60);if(sg===60){m++;sg=0}
   return q+"º cuarto · "+m+":"+(sg<10?"0":"")+sg;
 }
@@ -2681,7 +2683,7 @@ function liveTab(k){M.bt=k;var g=document.getElementById("lvct"),b=document.getE
 function btTabs(){var o=M.bt==="o";return '<div style="display:flex;gap:6px"><button class="ghost tab'+(o?'':' on')+'" style="width:auto;min-height:34px;padding:5px 10px;font-size:13px" onclick="liveTab(\'m\')">Tu equipo</button><button class="ghost tab'+(o?' on':'')+'" style="width:auto;min-height:34px;padding:5px 10px;font-size:13px" onclick="liveTab(\'o\')">Rival</button></div>'}
 function minOf(p){
   var c=M.cur,x=0,on=M.roster.indexOf(p)>-1?M.roster.indexOf(p)<5:M.opp.pl.indexOf(p)<5;
-  if(M.run&&c&&on)x=Math.min(1,c.t/liveSteps())*12/M.n;
+  if(M.run&&c&&on)x=Math.min(1,c.t/liveSteps())*12/M.n*(M.i>=M.n?5/6:1);
   return Math.floor(((p.mn||0)+x)*4);
 }
 function teamRows(L,mine){
@@ -2736,7 +2738,14 @@ function liveRefresh(){if(M&&M.run){M.dk="x";updLive()}else showMoment()}
 function liveTO(){if(!M||M.tos<=0)return;timeout(true);showLine({t:"Tiempo muerto: el quinteto respira y el rival pierde el ritmo.",m:true,me:M.dMe,op:M.dOp});updLive()}
 function liveSpd(){var c=M.cur,s0=liveSteps();S.spd=S.spd==="r"?"n":"r";save();if(c)c.t=Math.round(c.t*liveSteps()/s0);var b=document.getElementById("lvsp");if(b)b.textContent=S.spd==="r"?"Rápida":"Normal"}
 document.addEventListener("visibilitychange",function(){if(document.hidden&&M&&M.run)liveStop()});
-function endReg(){if(M.me===M.op){overtime();return}finish()}
+function endReg(){if(M.me===M.op){if(M.ot<4){startOT();return}M.me++}finish()}
+function mEnd(){return M.n+2*(M.ot||0)}
+function gTime(i){return i<=M.n?i*48/M.n:48+(i-M.n)*2.5}
+function startOT(){
+  M.ot=(M.ot||0)+1;M.run=false;clearTimeout(LT);M.cur=null;M.gt=gTime(M.i);
+  M.event="¡Prórroga"+(M.ot>1?" "+M.ot:"")+"! Empate "+M.me+"-"+M.op+": se juegan 5 minutos más.";
+  showMoment();
+}
 function overtime(){
   M.ot++;
   var r=segment("bal",Math.round(10*(M.cx?M.cx.poss:LC().poss)/100));
@@ -2941,7 +2950,7 @@ function showMoment(){
     '<div><div class="bar"><i style="width:'+Math.round(c[i].en)+'%;background:'+barColor(c[i].en)+'"></i></div><div class="s" style="text-align:right">'+Math.round(c[i].en)+'%</div></div></div>';
   }
   var opts=function(sel){return '<option value="">Nadie en especial</option>'+c.map(function(p){return '<option value="'+i2(p.name)+'"'+(p.name===sel?' selected':'')+'>'+sn(p.name)+'</option>'}).join("")};
-  var lbl=M.i===0&&!M.cur?"Antes del salto":M.cur?"Pausa · "+gameClock():M.i===M.n/2?"Entretiempo":"Final del "+(M.i/(M.n/4))+"º cuarto";
+  var lbl=M.i>=M.n&&!M.cur?"Prórroga"+(M.ot>1?" "+M.ot:""):M.i===0&&!M.cur?"Antes del salto":M.cur?"Pausa · "+gameClock():M.i===M.n/2?"Entretiempo":"Final del "+(M.i/(M.n/4))+"º cuarto";
   var SD={bal:"Sin riesgos, cansancio normal",atk:"Más puntos, pero te cansás más y defendés peor",def:"Menos posesiones y frenás al rival, pero anotás menos",tri:"Más riesgo, más premio. Tiro de tu quinteto: "+Math.round(cAvg('tir'))+"."};
   $('<div class="lv"><div class="lvl"><div class="stk">'+pauseBoard(lbl)+'</div>'+quickHTML()+decHTML()+(M.i===0&&!M.cur?preHTML():qtrHTML())+
     '<h2 style="margin-top:14px">Estrategia</h2>'+
@@ -3401,7 +3410,7 @@ function showSave(msg){
   PRECODE="";if(navigator.share&&S&&S.my){packState().then(function(c){PRECODE=c})}
 }
 /* El iPhone solo abre Compartir si se llama apenas se toca el botón: el código se arma antes, al abrir la pantalla */
-var PRECODE="",GAMEVER="32";
+var PRECODE="",GAMEVER="33";
 function shareCode(){
   if(!PRECODE){exportCode();return}
   navigator.share({title:"Partida Basket Manager",text:PRECODE}).then(function(){toast("Código enviado ✓")},function(e){if(!e||e.name!=="AbortError")exportCode()});
@@ -3705,6 +3714,7 @@ function quickHTML(){
   var pre=M.i===0&&!M.cur,txt="",btn="",go='<button class="ghost" style="font-weight:800" onclick="liveGo()">'+(pre?"▶ Empezar":"▶ Seguir")+'</button>';
   if(pre){var R=preRec();txt=M.preOk?"✓ Consejos aplicados.":"Estrategia <b>"+strWord(R.st)+"</b>, que <b>"+sn(R.by.name)+"</b> marque a <b>"+sn(R.mk.name)+"</b> y la pelota para <b>"+sn(R.bo.name)+"</b>.";if(!M.preOk)btn='<button class="primary" onclick="applyPre()">✓ Aplicar</button>'}
   else if(!M.cur&&M.i>0&&M.i<M.n&&!(M.i%(M.n/4))){qtrHTML();var r=M.qrec&&M.qrec.r;txt=M.qok===M.i?"✓ Hecho.":r?r.t:"El plan está funcionando. Seguí así.";if(r&&M.qok!==M.i)btn='<button class="primary" onclick="applyQtr()">✓ Hacerlo</button>'}
+  else if(M.i>=M.n&&!M.cur)txt="¡Prórroga! Empate "+M.me+"-"+M.op+". 5 minutos más: elegí la estrategia y tocá Seguir.";
   else txt="Partido en pausa.";
   if(!btn)go=go.replace('class="ghost"','class="primary"');
   return '<div class="quick"><p>🗣️ '+txt+'</p><div class="qb'+(btn?'':' one')+'">'+btn+go+'</div></div>';
