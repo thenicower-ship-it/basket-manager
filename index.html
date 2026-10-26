@@ -2495,7 +2495,7 @@ function myShooter(three){
   return wpick(court(),function(p){var b=three?p.a.tir:p.a.int;return Math.max(1,(eff(p,"off")+b)/2-40)*(M.focus===p.name?2.5:1)});
 }
 function oppShooter(three){
-  return wpick(oppCourt(),function(p){var b=three?p.a.tir:p.a.int,w=Math.max(1,(p.off+b)/2-40);if(p.name===M.opp.mk){if(M.dbl)w*=0.4;else if(onCourt(M.stop))w*=0.6}return w});
+  return wpick(oppCourt(),function(p){var b=three?p.a.tir:p.a.int,w=Math.max(1,(p.off+b)/2-40)*(1+0.25*mmEdge(p,defOf(p,true),three));if(p.name===M.opp.mk){if(M.dbl)w*=0.4;else if(onCourt(M.stop))w*=0.6}return w});
 }
 function lg(t,mine){M.log.push({t:t,m:mine})}
 function myFoul(n,txt){
@@ -2519,6 +2519,7 @@ function possMine(off,def,strat){
   var adj=((three?cAvg("tir"):cAvg("int"))-o)/120;
   var p=clamp(0.52+(off-def-(M.cx?M.cx.lg:LG))/200-(three?0.13:0)+adj,0.2,0.75);
   var sh=myShooter(three);
+  p=clamp(p+mmAdj(sh,defOf(sh,false),three),0.2,0.75);
   if(Math.random()<p){
     var pts=three?3:2;ad(sh,"pts",pts);
     var as=null;
@@ -2539,7 +2540,8 @@ function possOpp(off,def,os){
   var three=Math.random()<Math.min(0.7,(os==="tri"?0.55:0.28)+M.mod.t3+(M.dbl?0.08:0)),A=M.opp.A;
   var adj=A?((three?A.tir:A.int)-A.off)/120:0;
   var sh=oppShooter(three);
-  if(sh.name===M.opp.mk&&onCourt(M.stop)){var st=court().filter(function(x){return x.name===M.stop})[0];adj-=(st.a.dfn-60)/250}
+  var dm=defOf(sh,true);adj+=mmAdj(sh,dm,three);
+  if(sh.name===M.opp.mk&&dm&&dm.name===M.stop)adj-=0.02;
   var p=clamp(0.52+(off-def-(M.cx?M.cx.lg:LG))/200-(three?0.13:0)+adj,0.2,0.75);
   if(Math.random()<0.15){myFoul();ad(sh,"fd")}
   if(Math.random()<p){
@@ -2689,8 +2691,9 @@ function minOf(p){
 function teamRows(L,mine){
   var h='<div class="bx2 h"><span class="nm">'+(mine?TEAMS[S.my].name:M.opp.name)+'</span><span>MIN</span><span>PTS</span><span>REB</span><span>AST</span><span>F</span><span>PIR</span><span>EN</span></div>';
   return h+L.map(function(p,i){
-    var d=sv(p),pv=pir(d),tag=mine?(p.name===M.focus?' 🏀':'')+(p.name===M.stop?' 🔒':''):(p.name===M.opp.mk?' 🎯':'');
-    return '<div class="bx2'+(i===5?' cut':'')+(i>=5?' bn':'')+'"><span class="nm">'+sn(p.name)+tag+(p.out?' <span class="lose">E</span>':'')+'</span><span>'+minOf(p)+'</span><b>'+d.pts+'</b><span>'+d.reb+'</span><span>'+d.ast+'</span>'+
+    var d=sv(p),pv=pir(d),tag=mine?(p.name===M.focus?' 🏀':'')+(p.name===M.stop?' 🔒':''):(p.name===M.opp.mk?' 🎯':''),mk="";
+    if(mine&&i<5){var ma=markMap()[p.name];if(ma){var dd=sz(ma.pos)-sz(p.pos),me=mmEdge(p,defOf(p,false),false)||mmEdge(p,defOf(p,false),true);mk=' <span class="mko'+(dd>=2||dd<=-2?' bad':'')+'">›'+lastN(ma.name)+'</span>'+(me?' <span class="mke">⚡</span>':'')}}
+    return '<div class="bx2'+(i===5?' cut':'')+(i>=5?' bn':'')+'"><span class="nm">'+sn(p.name)+tag+mk+(p.out?' <span class="lose">E</span>':'')+'</span><span>'+minOf(p)+'</span><b>'+d.pts+'</b><span>'+d.reb+'</span><span>'+d.ast+'</span>'+
       '<span class="'+(d.pf>=FMAX()-1?"lose":"")+'">'+d.pf+'</span><b class="'+(pv<0?"lose":pv>=15?"win":"")+'">'+pv+'</b>'+
       '<span style="color:'+barColor(p.en)+';font-weight:700">'+Math.round(p.en)+'</span></div>';
   }).join("");
@@ -2756,15 +2759,15 @@ function overtime(){
   finish();
 }
 /* Decisiones */
-function bestDef(){return court().reduce(function(b,p){return p.a.dfn>b.a.dfn?p:b},court()[0])}
+function bestDef(t){if(t)return bestDefFor(t);return court().reduce(function(b,p){return p.a.dfn>b.a.dfn?p:b},court()[0])}
 function bestOff(){return court().reduce(function(b,p){return eff(p,"off")>eff(b,"off")?p:b},court()[0])}
 function checkDec(r){
   var half=M.i<=M.n/2?1:2,c=court(),st=M.opp.pl.filter(function(p){return p.name===M.opp.star})[0];
   if(M.dec)return;
   if(r.op-r.my>=8&&!M.used["run"+half]){M.used["run"+half]=1;M.dec={k:"run",t:"Racha del rival",x:M.opp.name+" te hizo un parcial de "+r.op+"-"+r.my+".",o:[{l:"Tiempo muerto",d:M.tos>0?"Recupera energía y corta el ritmo del rival.":"No te quedan tiempos muertos.",dis:M.tos<=0},{l:"Defensa en zona",d:"El próximo tramo el rival ataca peor, pero tira más triples."},{l:"Arengar al equipo",d:"El próximo tramo tu equipo ataca con más energía."},{l:"Seguir igual",d:"Confiás en lo que venís haciendo."}]};return}
-  if(st&&st.pts>=(M.n===6?14:11)&&M.i<M.n-1&&!M.used.star&&!(M.opp.mk===st.name&&(M.dbl||onCourt(M.stop)))){M.used.star=1;var bd=bestDef();M.dec={k:"star",t:"La figura rival está encendida",x:sn(st.name)+" ya lleva "+st.pts+" puntos.",o:[{l:"Marcarlo con "+sn(bd.name),d:"Tu mejor defensor (defensa individual "+bd.a.dfn+") lo sigue a todos lados.",p:bd.name},{l:"Doble marca",d:"Lo encimás entre dos: tira menos, pero sus compañeros quedan más libres para el triple."},{l:"Seguir igual",d:"No cambiás la defensa."}]};return}
+  if(st&&st.pts>=(M.n===6?14:11)&&M.i<M.n-1&&!M.used.star&&!(M.opp.mk===st.name&&(M.dbl||onCourt(M.stop)))){M.used.star=1;var bd=bestDef(st);M.dec={k:"star",t:"La figura rival está encendida",x:sn(st.name)+" ya lleva "+st.pts+" puntos.",o:[{l:"Marcarlo con "+sn(bd.name),d:bd.pos+", defensa individual "+bd.a.dfn+": el mejor de tu quinteto para su posición.",p:bd.name},{l:"Doble marca",d:"Lo encimás entre dos: tira menos, pero sus compañeros quedan más libres para el triple."},{l:"Seguir igual",d:"No cambiás la defensa."}]};return}
   if(M.i>=1&&M.i<M.n-1){var hp=oppCourt().filter(function(p){return oppHot(p)>=6&&!M.used["mk"+p.name]&&!(M.opp.mk===p.name&&(M.dbl||onCourt(M.stop)))}).sort(function(a,b){return oppHot(b)-oppHot(a)})[0];
-    if(hp){M.used["mk"+hp.name]=1;var bd2=bestDef();M.dec={k:"mk",p:bd2.name,q:hp.name,t:sn(hp.name)+" está caliente",x:"Lleva "+oppHot(hp)+" puntos en los últimos minutos ("+hp.pts+" en total).",o:[{l:"Que lo marque "+sn(bd2.name),d:"Defensa individual "+bd2.a.dfn+". Le va a costar más tirar."},{l:"Doble marca",d:"Tira menos, pero sus compañeros quedan más libres."},{l:"Seguir igual",d:"No cambiás la defensa."}]};return}}
+    if(hp){M.used["mk"+hp.name]=1;var bd2=bestDef(hp);M.dec={k:"mk",p:bd2.name,q:hp.name,t:sn(hp.name)+" está caliente",x:"Lleva "+oppHot(hp)+" puntos en los últimos minutos ("+hp.pts+" en total).",o:[{l:"Que lo marque "+sn(bd2.name),d:bd2.pos+", defensa individual "+bd2.a.dfn+". Le va a costar más tirar."},{l:"Doble marca",d:"Tira menos, pero sus compañeros quedan más libres."},{l:"Seguir igual",d:"No cambiás la defensa."}]};return}}
   var t3h=M.t3h||[],l3=t3h.length>=3?t3h[t3h.length-1]-t3h[t3h.length-3]:0;
   if(l3>=3&&M.i<M.n-1&&M.strat!=="def"&&!M.used["t3"+half]){M.used["t3"+half]=1;M.dec={k:"t3",t:"Te están lastimando de triples",x:M.opp.name+" metió "+l3+" triples en los últimos minutos.",o:[{l:"Cerrar el perímetro",d:"Pasás a Defensa: les cuesta más tirar de afuera."},{l:"Seguir igual",d:"Confiás en que van a dejar de entrar."}]};return}
   var ae=0;c.forEach(function(p){ae+=p.en});ae/=c.length;
@@ -2961,20 +2964,20 @@ function showMoment(){
     '<div class="card" style="margin-top:12px"><h2>Instrucciones</h2>'+
     '<label class="muted" style="display:block;font-size:14px">Darle la pelota a</label><select style="width:100%;padding:10px;margin:4px 0 10px;font-size:16px;border-radius:10px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink)" onchange="setFocus(this.value)">'+opts(M.focus)+'</select>'+
     '<label class="muted" style="display:block;font-size:14px">A qué rival marcás</label><select style="width:100%;padding:10px;margin:4px 0 10px;font-size:16px;border-radius:10px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink)" onchange="setMk(this.value)">'+oppCourt().map(function(p,j){return '<option value="'+j+'"'+(p.name===M.opp.mk?' selected':'')+'>'+sn(p.name)+(p.name===M.opp.star?' (figura)':'')+'</option>'}).join("")+'</select>'+
-    '<label class="muted" style="display:block;font-size:14px">Quién marca a '+sn(M.opp.mk)+'</label><select style="width:100%;padding:10px;margin:4px 0 6px;font-size:16px;border-radius:10px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink)" onchange="setStop(this.value)">'+opts(M.stop)+'</select>'+
+    '<label class="muted" style="display:block;font-size:14px">Quién marca a '+sn(M.opp.mk)+'</label><select style="width:100%;padding:10px;margin:4px 0 6px;font-size:16px;border-radius:10px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink)" onchange="setStop(this.value)">'+opts(M.stop)+'</select>'+(stopRisk()?'<p class="lose" style="margin:0 0 6px;font-size:13px">⚠'+stopRisk()+'</p>':'')+
     (M.dbl?'<p class="muted" style="margin:6px 0 0">Doble marca activa sobre '+sn(M.opp.mk)+'. <a href="#" onclick="M.dbl=false;showMoment();return false">Quitarla</a></p>':'')+
     '<p class="muted" style="margin:6px 0 0;font-size:13px">El jugador con la pelota tira más y se cansa más. El que marca al rival elegido le hace tirar peor, según su defensa individual.</p></div></div></div>');
 }
 function i2(n){var k=-1;M.roster.forEach(function(p,j){if(p.name===n)k=j});return k}
 function setFocus(v){M.focus=v===""?null:M.roster[+v].name;M.event=M.focus?"La pelota pasa por "+sn(M.focus)+".":"Juego repartido entre todos.";showMoment()}
-function setStop(v){M.stop=v===""?null:M.roster[+v].name;if(M.stop)M.dbl=false;M.event=M.stop?sn(M.stop)+" marca a "+sn(M.opp.mk)+".":"Defensa sin marca especial.";showMoment()}
+function setStop(v){M.stop=v===""?null:M.roster[+v].name;if(M.stop)M.dbl=false;M.event=M.stop?sn(M.stop)+" marca a "+sn(M.opp.mk)+"."+stopRisk():"Defensa sin marca especial.";showMoment()}
 function setMk(j){var p=oppCourt()[+j];if(!p)return;M.opp.mk=p.name;M.event=(M.stop&&onCourt(M.stop)?sn(M.stop)+" pasa a marcar a ":M.dbl?"La doble marca pasa a ":"Tu defensa apunta a ")+sn(p.name)+".";showMoment()}
 /* Estadísticas del rival en vivo */
 function oppHot(p){var h=p.h||[];return (h[h.length-1]||0)+(h[h.length-2]||0)}
 function oppDanger(p){return M.i===0?(p.off+Math.max(p.a.tir,p.a.int))/2:p.pts+oppHot(p)*1.5}
 function oppSugg(){
   var c=oppCourt(),t=c.reduce(function(b,p){return oppDanger(p)>oppDanger(b)?p:b},c[0]);
-  var bd=bestDef();
+  var bd=bestDefFor(t);
   if(M.opp.mk===t.name&&(M.dbl||(onCourt(M.stop))))return {p:t,ok:true};
   return {p:t,d:bd};
 }
@@ -3410,7 +3413,7 @@ function showSave(msg){
   PRECODE="";if(navigator.share&&S&&S.my){packState().then(function(c){PRECODE=c})}
 }
 /* El iPhone solo abre Compartir si se llama apenas se toca el botón: el código se arma antes, al abrir la pantalla */
-var PRECODE="",GAMEVER="33";
+var PRECODE="",GAMEVER="34";
 function shareCode(){
   if(!PRECODE){exportCode();return}
   navigator.share({title:"Partida Basket Manager",text:PRECODE}).then(function(){toast("Código enviado ✓")},function(e){if(!e||e.name!=="AbortError")exportCode()});
@@ -3620,6 +3623,10 @@ function assistTip(){
   if(ae<60){if(M.tos>0)M.tipA={k:"to",l:"Tiempo muerto"};return "El quinteto está al "+Math.round(ae)+"% de energía."+(M.tos>0?" Un tiempo muerto ayuda.":"")}
   var t3h=M.t3h||[];if(t3h.length>=2&&t3h[t3h.length-1]-t3h[t3h.length-2]>=2){if(M.strat!=="def")M.tipA={k:"def",l:"Defensa"};return "Nos metieron "+(t3h[t3h.length-1]-t3h[t3h.length-2])+" triples seguidos: hay que salir a los tiradores."}
   var s=oppSugg();if(!s.ok&&oppHot(s.p)>=6){M.tipA={k:"mk",l:"Marcarlo"};return sn(s.p.name)+" está caliente ("+oppHot(s.p)+" pts recientes). Que lo marque "+sn(s.d.name)+"."}
+  var mm=c.filter(function(p){return p.name!==M.focus&&p.en>=55&&(mmEdge(p,defOf(p,false),false)||(mmEdge(p,defOf(p,false),true)&&p.a.tir>=60))})[0];
+  if(mm){var dq=defOf(mm,false);M.tipA={k:"fo",v:mm.name,l:"Dale la pelota"};return sn(mm.name)+" tiene un desajuste a favor: lo marca "+sn(dq.name)+" ("+dq.pos+")."}
+  var bd0=c.map(function(p){return {p:p,o:markMap()[p.name]}}).filter(function(x){return x.o&&mmEdge(x.o,x.p,false)})[0];
+  if(bd0)return "Ojo: "+sn(bd0.o.name)+" ("+bd0.o.pos+") le saca ventaja de tamaño a "+sn(bd0.p.name)+" ("+bd0.p.pos+").";
   var bp=c.slice().sort(function(a,b){return pir(b)-pir(a)})[0];if(bp&&pir(bp)>=10&&bp.name!==M.focus){M.tipA={k:"fo",v:bp.name,l:"Dale la pelota"};return sn(bp.name)+" es el mejor en cancha (PIR "+pir(bp)+")."}
   if(diff>=10)return "Vamos +"+diff+". Sigamos concentrados atrás.";
   if(diff<=-10){if(M.strat!=="atk")M.tipA={k:"atk",l:"Ataque"};return "Vamos "+diff+". Hay que meter un parcial."}
@@ -3734,6 +3741,60 @@ function quickHTML(){
 .qb.one{grid-template-columns:1fr}
 .qb button{text-align:center;min-height:46px;padding:10px}
 @media (orientation:landscape) and (max-height:560px){.tipb{margin-top:4px;padding:3px 6px 3px 10px;font-size:12.5px}.tipb button{min-height:30px;padding:3px 10px}.decbar{padding-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom,0px))}.decbar .in{display:flex;gap:12px;align-items:center}.decbar .in>.row{flex:1;min-width:0}.decbar .in>.row p:first-child{display:none}.dopts{margin-top:0;flex:0 0 55%}.dopts button{min-height:40px}}
+</style>
+<script>
+/* ---------- v34: marcas por posición y desajustes ---------- */
+var SZ={PG:1,G:1.5,SG:2,SF:3,F:3.5,PF:4,C:5};
+function sz(pos){return SZ[pos]||3}
+function lastN(n){var s=sn(n),i=s.indexOf(". ");return i>=0?s.slice(i+2):s}
+/* empareja por tamaño: el más chico con el más chico */
+function pairBySize(att,def){
+  var A=att.map(function(p,i){return {p:p,i:i}}).sort(function(x,y){return sz(x.p.pos)-sz(y.p.pos)||x.i-y.i});
+  var D=def.map(function(p,i){return {p:p,i:i}}).sort(function(x,y){return sz(x.p.pos)-sz(y.p.pos)||x.i-y.i});
+  var m={};A.forEach(function(x,k){m[x.p.name]=D[k]?D[k].p:null});return m;
+}
+/* quién marca a cada rival (con tu marca especial) */
+function markMap(){
+  var m=pairBySize(oppCourt(),court()),inv={};
+  if(M.stop&&onCourt(M.stop)&&M.opp.mk&&oppCourt().some(function(p){return p.name===M.opp.mk})){
+    var st=court().filter(function(x){return x.name===M.stop})[0],cur=m[M.opp.mk];
+    if(cur&&cur!==st){var other=null;Object.keys(m).forEach(function(k){if(m[k]===st)other=k});if(other)m[other]=cur;m[M.opp.mk]=st}
+  }
+  Object.keys(m).forEach(function(k){if(m[k])inv[m[k].name]=oppCourt().filter(function(p){return p.name===k})[0]});
+  return inv;
+}
+function defOf(sh,oppAtt){
+  if(oppAtt){var inv=markMap(),r=null;Object.keys(inv).forEach(function(k){if(inv[k]===sh)r=court().filter(function(x){return x.name===k})[0]});return r}
+  return pairBySize(court(),oppCourt())[sh.name]||null;
+}
+/* ventaja del atacante: 0 sin ventaja, hasta 2 */
+function mmEdge(a,d,three){
+  if(!d)return 0;var ds=sz(a.pos)-sz(d.pos);
+  return three?Math.max(0,-ds-1):Math.max(0,ds-1);
+}
+function mmAdj(a,d,three){
+  if(!d)return 0;var dt=court().indexOf(d)>=0?court():oppCourt(),av=0;dt.forEach(function(q){av+=q.a?q.a.dfn:60});av/=dt.length;
+  var ds=sz(a.pos)-sz(d.pos),x=-((d.a?d.a.dfn:60)-av)/250;
+  if(three)x+=0.02*Math.max(0,-ds)-0.005*Math.max(0,ds);
+  else x+=0.025*Math.max(0,ds)-0.01*Math.max(0,-ds);
+  return clamp(x,-0.1,0.1);
+}
+function bestDefFor(t){
+  return court().reduce(function(b,p){var v=p.a.dfn-12*Math.abs(sz(p.pos)-sz(t.pos)),w=b.a.dfn-12*Math.abs(sz(b.pos)-sz(t.pos));return v>w?p:b},court()[0]);
+}
+function stopRisk(){
+  if(!M.stop||!M.opp.mk)return "";
+  var s=M.roster.filter(function(x){return x.name===M.stop})[0],t=M.opp.pl.filter(function(x){return x.name===M.opp.mk})[0];
+  if(!s||!t)return "";var ds=sz(t.pos)-sz(s.pos);
+  if(ds>=2)return " Ojo: "+sn(s.name)+" ("+s.pos+") es más chico que "+sn(t.name)+" ("+t.pos+"): le va a costar cerca del aro.";
+  if(ds<=-2)return " Ojo: "+sn(s.name)+" ("+s.pos+") marcando a un "+t.pos+": le va a costar afuera.";
+  return "";
+}
+</script>
+<style>
+.mko{font-weight:500;color:var(--muted);font-size:11.5px}
+.mko.bad{color:var(--bad);font-weight:700}
+.mke{font-size:11px}
 </style>
 <script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost"))navigator.serviceWorker.register("sw.js").catch(function(){});</script>
 </body>
