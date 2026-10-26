@@ -2452,10 +2452,10 @@ function oppCourt(){return M.opp.pl.slice(0,5)}
 function playGame(opp){
   var hl=healthy(S.my).slice(),nr=0;
   while(hl.length<7){nr++;hl.push({name:"Suplente "+nr,pos:"G",off:55,def:55})}
-  var r=hl.map(function(p){return stz({name:p.name,pos:p.pos,off:p.off,def:p.def,en:enOf(p.name),a:attrs(p)})});
+  var r=hl.map(function(p,i){return stz({name:p.name,pos:p.pos,off:p.off,def:p.def,en:enOf(p.name),a:attrs(p),st:i<5})});
   var oh=healthy(opp),os=calcStr(opp,oh);
-  var opl=oh.slice(0,9).map(function(p){return stz({name:p.name,pos:p.pos,off:p.off,def:p.def,a:attrs(p),h:[]})});
-  while(opl.length<5)opl.push(stz({name:"Suplente rival",pos:"G",off:55,def:55,a:attrs({name:"x",pos:"G",off:55,def:55}),h:[]}));
+  var opl=oh.slice(0,9).map(function(p,i){return stz({name:p.name,pos:p.pos,off:p.off,def:p.def,a:attrs(p),h:[],en:enOf(p.name),st:i<5})});
+  while(opl.length<5)opl.push(stz({name:"Suplente rival",pos:"G",off:55,def:55,a:attrs({name:"x",pos:"G",off:55,def:55}),h:[],en:100,st:true}));
   var star=opl.slice(0,5).reduce(function(b,p){return p.off>b.off?p:b},opl[0]);
   M={roster:r,i:0,n:16,me:0,op:0,tos:3,tm:false,ot:0,oppEn:avgEn(opp),cx:curCx(),
      opp:{id:opp,A:oppAttrs(opp),name:TEAMS[opp].name,o:os.o+adjOf(opp),d:os.d+adjOf(opp),pl:opl,star:star.name,mk:star.name},
@@ -2486,6 +2486,7 @@ function myFoul(n,txt){
   return p;
 }
 function possMine(off,def,strat){
+  if(Math.random()<0.13&&M.opp.pl[0].en!=null)oppFoul();
   var three=Math.random()<(strat==="tri"?0.55:0.28),c=court(),o=0;
   c.forEach(function(p){o+=p.off});o/=c.length;
   var adj=((three?cAvg("tir"):cAvg("int"))-o)/120;
@@ -2496,7 +2497,7 @@ function possMine(off,def,strat){
     var as=null;
     if(Math.random()<0.58){var oth=c.filter(function(x){return x!==sh});as=wpick(oth,function(x){return Math.max(2,x.a.pas-35)});ad(as,"ast")}
     if(three){ad(sh,"fga");ad(sh,"fgm");ad(sh,"t3a");ad(sh,"t3m");lg(as?sn(as.name)+" asiste y ¡triple de "+sn(sh.name)+"!":"¡Triple de "+sn(sh.name)+"!",true)}
-    else if(!as&&Math.random()<0.2){ad(sh,"fta",2);ad(sh,"ftm",2);ad(sh,"fd");lg(sn(sh.name)+" recibe falta y mete los dos libres.",true)}
+    else if(!as&&Math.random()<0.2){ad(sh,"fta",2);ad(sh,"ftm",2);ad(sh,"fd");var of=M.opp.pl[0].en!=null?oppFoul(true):null;lg(sn(sh.name)+" recibe falta"+(of?" de "+sn(of.name):"")+" y mete los dos libres.",true)}
     else{ad(sh,"fga");ad(sh,"fgm");lg(as?sn(as.name)+" asiste a "+sn(sh.name)+", que anota.":sn(sh.name)+" encara y anota.",true)}
     return pts;
   }
@@ -2545,14 +2546,18 @@ function segment(strat,N){
   var tag=function(k,s,f){for(;k<M.log.length;k++){M.log[k].me=me0+my;M.log[k].op=op0+op;M.log[k].f=f}for(;s<M.sev.length;s++)M.sev[s].f=f};
   for(i=0;i<n;i++){k=M.log.length;s=M.sev.length;my+=possMine(myO,opD,strat);tag(k,s,(i+0.35)/n);k=M.log.length;s=M.sev.length;op+=possOpp(opO,myD,os);tag(k,s,(i+0.85)/n)}
   M.opp.pl.forEach(function(p,j){(p.h=p.h||[]).push(p.pts-p0[j])});
-  M.me+=my;M.op+=op;M.mod={o:0,d:0,oo:0,t3:0};
+  M.me+=my;M.op+=op;M.mod={o:0,d:0,oo:0,t3:0};M.oso=os;
   return {my:my,op:op,os:os};
 }
 function fatigue(strat){
   var sc=12/M.n;
   var cost=(COST+(strat==="atk"?2:strat==="tri"?1:0))*sc;
   court().forEach(function(p){p.en=Math.max(5,p.en-cost-rnd(-1,2)-(p.name===M.focus?1.5*sc:0));p.mn=(p.mn||0)+sc});
-  M.oppEn=Math.max(30,M.oppEn-cost*OPP_TIRE);
+  if(M.opp.pl[0].en!=null){var oc=(COST+(M.oso==="atk"?2:M.oso==="tri"?1:0))*sc;
+    M.opp.pl.forEach(function(p,j){if(j<5){p.en=Math.max(5,p.en-oc-rnd(-1,2));p.mn=(p.mn||0)+sc}else p.en=Math.min(100,p.en+REC*sc)});
+    rotCount(M.opp.pl);oppEnSet()}
+  else M.oppEn=Math.max(30,M.oppEn-cost*OPP_TIRE);
+  rotCount(M.roster);
   bench().forEach(function(p){p.en=Math.min(100,p.en+REC*sc)});
 }
 /* Partido automático: corre solo y se para al final de cada cuarto */
@@ -2601,7 +2606,7 @@ function endTramo(){
     endReg();return;
   }
   var t3s=0;M.opp.pl.forEach(function(p){t3s+=p.t3m||0});(M.t3h=M.t3h||[]).push(t3s);
-  autoSubs();
+  autoSubs();oppSubs();
   if(M.dec&&M.i-M.dec.at>=2){M.dec=null}
   checkDec(c.r);
   if(M.dec&&M.dec.at==null)M.dec.at=M.i;
@@ -2650,14 +2655,14 @@ function liveLog(){
 function liveTab(k){M.bt=k;var g=document.getElementById("lvct"),b=document.getElementById("lvbt");if(g)g.innerHTML=liveCourt();if(b)b.innerHTML=btTabs()}
 function btTabs(){var o=M.bt==="o";return '<div style="display:flex;gap:6px"><button class="ghost tab'+(o?'':' on')+'" style="width:auto;min-height:34px;padding:5px 10px;font-size:13px" onclick="liveTab(\'m\')">Tu equipo</button><button class="ghost tab'+(o?' on':'')+'" style="width:auto;min-height:34px;padding:5px 10px;font-size:13px" onclick="liveTab(\'o\')">Rival</button></div>'}
 function liveCourt(){
-  var o=M.bt==="o",h='<div class="bx h'+(o?' o':'')+'"><span>'+(o?sn(M.opp.name):'Jugador')+'</span><span>PTS</span><span>REB</span><span>AST</span><span>'+(o?'TC':'F')+'</span><span>PIR</span>'+(o?'':'<span>EN</span>')+'</div>';
+  var o=M.bt==="o",oe=o&&M.opp.pl[0].en!=null,h='<div class="bx h'+(o&&!oe?' o':'')+'"><span>'+(o?sn(M.opp.name):'Jugador')+'</span><span>PTS</span><span>REB</span><span>AST</span><span>'+(o&&!oe?'TC':'F')+'</span><span>PIR</span>'+(o&&!oe?'':'<span>EN</span>')+'</div>';
   var L=o?M.opp.pl:M.roster;
   return h+L.map(function(p,i){
-    if(o&&i>=5&&!p.pts&&!p.reb&&!p.ast)return "";
+    if(o&&!oe&&i>=5&&!p.pts&&!p.reb&&!p.ast)return "";
     var d=sv(p),pv=pir(d);
-    return '<div class="bx'+(o?' o':'')+(i===5?' cut':'')+(i>=5?' bn':'')+'"><span class="nm">'+sn(p.name)+(p.out?' <span class="lose">(elim.)</span>':'')+(!o&&p.name===M.focus?' 🏀':'')+(p.name===M.stop||(o&&p.name===M.opp.mk)?' 🔒':'')+'</span><b>'+d.pts+'</b><span>'+d.reb+'</span><span>'+d.ast+'</span>'+
-      (o?'<span>'+d.fgm+'/'+d.fga+'</span>':'<span class="'+(d.pf>=FMAX()-1?"lose":"")+'">'+d.pf+'</span>')+'<b class="'+(pv<0?"lose":pv>=15?"win":"")+'">'+pv+'</b>'+
-      (o?'':'<span style="color:'+barColor(p.en)+';font-weight:700">'+Math.round(p.en)+'</span>')+'</div>';
+    return '<div class="bx'+(o&&!oe?' o':'')+(i===5?' cut':'')+(i>=5?' bn':'')+'"><span class="nm">'+sn(p.name)+(p.out?' <span class="lose">(elim.)</span>':'')+(!o&&p.name===M.focus?' 🏀':'')+(p.name===M.stop||(o&&p.name===M.opp.mk)?' 🔒':'')+'</span><b>'+d.pts+'</b><span>'+d.reb+'</span><span>'+d.ast+'</span>'+
+      (o&&!oe?'<span>'+d.fgm+'/'+d.fga+'</span>':'<span class="'+(d.pf>=FMAX()-1?"lose":"")+'">'+d.pf+'</span>')+'<b class="'+(pv<0?"lose":pv>=15?"win":"")+'">'+pv+'</b>'+
+      (o&&!oe?'':'<span style="color:'+barColor(p.en)+';font-weight:700">'+Math.round(p.en)+'</span>')+'</div>';
   }).join("");
 }
 function liveCourtOld(){
@@ -2852,6 +2857,8 @@ function suggestSubs(){
     });
     if(bi>=0){used[bi]=1;res.push({ci:x.ci,bi:bi,why:x.why})}
   });
+  var bc={},bb={};res.forEach(function(r){bc[r.ci]=1;bb[r.bi]=1});
+  rotPlan(M.roster,bc,bb,3,res);res.forEach(function(r){used[r.bi]=1});
   /* Vuelve un jugador mejor que ya descansó */
   if(res.length<3){
     var busy={};res.forEach(function(r){busy[r.ci]=1});
@@ -2995,7 +3002,7 @@ function fullBox(list,mine){
   return '<div class="fbw"><table class="fb">'+th+rows+tot+'</table></div>';
 }
 function boxBody(){
-  return '<div class="card"><h2>'+TEAMS[S.my].name+'</h2>'+fullBox(M.roster,true)+'</div><div class="card"><h2>'+M.opp.name+'</h2>'+fullBox(M.opp.pl.filter(function(p,i){return i<5||p.pts||p.reb||p.ast}),false)+'</div>'+
+  return '<div class="card"><h2>'+TEAMS[S.my].name+'</h2>'+fullBox(M.roster,true)+'</div><div class="card"><h2>'+M.opp.name+'</h2>'+fullBox(M.opp.pl.filter(function(p,i){return i<5||p.mn||p.pts||p.reb||p.ast}),false)+'</div>'+
     '<p class="muted" style="font-size:12px">TC tiros de campo · T3 triples · TL tiros libres · ROB robos · TAP tapones · PÉR pérdidas · F faltas. PIR = puntos + rebotes + asistencias + robos + tapones + faltas recibidas − tiros fallados − pérdidas − faltas.</p>';
 }
 function showBoxLive(){
@@ -3009,7 +3016,7 @@ function finish(){
   $('<h1 class="'+(res.win?"win":"lose")+'">'+(res.win?"¡Victoria!":"Derrota")+'</h1>'+
     boardHTML("Final"+(M.ot?" · tras prórroga":""))+
     '<div class="card"><h2>Planilla de tu equipo</h2>'+fullBox(M.roster.filter(function(p){return p.mn||p.pts}),true)+'</div>'+
-    '<div class="card"><h2>'+M.opp.name+'</h2>'+fullBox(M.opp.pl.filter(function(p,i){return i<5||p.pts||p.reb||p.ast}),false)+'</div>'+
+    '<div class="card"><h2>'+M.opp.name+'</h2>'+fullBox(M.opp.pl.filter(function(p,i){return i<5||p.mn||p.pts||p.reb||p.ast}),false)+'</div>'+
     newsHTML(res)+'<p>'+resultNote(res)+'</p><button class="primary" onclick="showHub()">Continuar</button>');
 }
 
@@ -3361,7 +3368,7 @@ function showSave(msg){
   PRECODE="";if(navigator.share&&S&&S.my){packState().then(function(c){PRECODE=c})}
 }
 /* El iPhone solo abre Compartir si se llama apenas se toca el botón: el código se arma antes, al abrir la pantalla */
-var PRECODE="",GAMEVER="29";
+var PRECODE="",GAMEVER="30";
 function shareCode(){
   if(!PRECODE){exportCode();return}
   navigator.share({title:"Partida Basket Manager",text:PRECODE}).then(function(){toast("Código enviado ✓")},function(e){if(!e||e.name!=="AbortError")exportCode()});
@@ -3577,6 +3584,74 @@ function assistTip(){
   return "Todo en orden. El partido está "+(Math.abs(diff)<=4?"parejo":diff>0?"a favor":"en contra")+".";
 }
 function tipHTML(){return M.tip?'<div style="margin-top:8px;padding:8px 12px;border-radius:12px;background:var(--mine);border:1px solid var(--wood);font-size:14px"><b>🗣️ Asistente:</b> '+M.tip+'</div>':""}
+</script>
+<script>
+/* ---------- v30: cansancio, cambios y faltas del rival ---------- */
+function oppEnSet(){var c=oppCourt(),s=0;c.forEach(function(p){s+=p.en});M.oppEn=Math.max(30,s/c.length)}
+function oppBench(){return M.opp.pl.slice(5).filter(function(p){return !p.out})}
+function oppSwap(ci,bi,why){
+  var L=M.opp.pl,o=L[ci],n=L[bi];L[ci]=n;L[bi]=o;
+  showLine({t:"Cambio en "+M.opp.name+": entra "+sn(n.name)+" por "+sn(o.name)+(why?" ("+why+")":"")+".",m:false,me:M.dMe,op:M.dOp});
+}
+function oppFoul(shooting){
+  var c=oppCourt(),F=FMAX(),p=wpick(c,function(x){return (({C:1.3,PF:1.2,SF:1,SG:0.9,PG:0.85})[x.pos]||1)*(x.pf>=F-1?0.35:x.pf===F-2?0.7:1)});
+  ad(p,"pf");
+  if(!shooting){var mine=wpick(court(),function(x){return Math.max(2,eff(x,"off")-40)});ad(mine,"fd")}
+  if(p.pf>=F){
+    p.out=true;var L=M.opp.pl,ci=L.indexOf(p),bi=-1,best=-1;
+    L.forEach(function(x,j){if(j>=5&&!x.out&&x.en>best){best=x.en;bi=j}});
+    lg(sn(p.name)+" ("+M.opp.name+") hace su "+(F===6?"sexta":"quinta")+" falta y queda eliminado."+(bi>=0?" Entra "+sn(L[bi].name)+".":""),true);
+    if(bi>=0){L[ci]=L[bi];L[bi]=p}
+  }
+  return p;
+}
+function oppSubs(){
+  if(!M||M.done||M.opp.pl[0].en==null)return;
+  var L=M.opp.pl,F=FMAX(),last=M.i>=M.n-1,n=0,used={};
+  var out=[];
+  oppCourt().forEach(function(p,i){
+    if(p.out)out.push({ci:i,why:"",u:300});
+    else if(p.pf>=F-1&&!last)out.push({ci:i,why:p.pf+" faltas",u:200});
+    else if(p.pf>=F-2&&M.i<M.n/2-1)out.push({ci:i,why:p.pf+" faltas",u:150});
+    else if(p.en<58)out.push({ci:i,why:"cansado",u:100-p.en});
+  });
+  out.sort(function(a,b){return b.u-a.u}).forEach(function(x){
+    if(n>=3)return;
+    var o=L[x.ci],bi=-1,bs=-1e9;
+    L.forEach(function(p,j){
+      if(j<5||p.out||used[j]||p.en<45)return;
+      if(x.u<150&&p.en<o.en+10)return;
+      var v=subFit(o,p);if(v>bs){bs=v;bi=j}
+    });
+    if(bi>=0){used[bi]=1;oppSwap(x.ci,bi,x.why);n++}
+  });
+  rotPlan(L,{},used,3-n,[]).forEach(function(r){oppSwap(r.ci,r.bi,r.why)});
+  oppEnSet();
+}
+</script>
+<script>
+/* ---------- v30: rotación (los titulares descansan y vuelven) ---------- */
+function rotCount(L){L.forEach(function(p,j){if(j<5){p.ct=(p.ct||0)+1;p.bt=0}else{p.bt=(p.bt||0)+1;p.ct=0}})}
+function rotPlan(L,busyC,busyB,max,res){
+  if(max<=0)return res;
+  var late=M.i>=M.n-2&&Math.abs(M.me-M.op)<=12,F=FMAX(),mine=L===M.roster;
+  var sat=function(p){return mine&&M.sit&&M.sit[p.name]>M.i};
+  L.forEach(function(p,j){
+    if(res.length>=max||j<5||p.out||busyB[j]||!p.st||p.en<85||sat(p))return;
+    if(!late&&((p.bt||0)<2||p.pf>=F-1))return;
+    var wi=-1,wq=1e9;
+    for(var pass=0;pass<2&&wi<0;pass++)L.slice(0,5).forEach(function(o,i){if(o.st||busyC[i])return;if(pass===0&&posGrp(o.pos)!==posGrp(p.pos))return;var q=(o.off+o.def)/2;if(q<wq){wq=q;wi=i}});
+    if(wi>=0){busyC[wi]=1;busyB[j]=1;res.push({ci:wi,bi:j,why:"vuelve descansado"})}
+  });
+  if(late)return res;
+  L.slice(0,5).map(function(p,i){return {p:p,i:i}}).filter(function(x){return (x.p.ct||0)>=3&&!busyC[x.i]}).sort(function(a,b){return (b.p.ct-a.p.ct)||(a.p.en-b.p.en)}).forEach(function(x){
+    if(res.length>=max)return;
+    var o=x.p,bi=-1,bs=-1e9,oq=(o.off+o.def)/2;
+    L.forEach(function(p,j){if(j<5||p.out||busyB[j]||p.en<80||sat(p))return;if((p.off+p.def)/2<oq-14)return;var v=subFit(o,p);if(v>bs){bs=v;bi=j}});
+    if(bi>=0){busyC[x.i]=1;busyB[bi]=1;res.push({ci:x.i,bi:bi,why:"descanso"})}
+  });
+  return res;
+}
 </script>
 <script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost"))navigator.serviceWorker.register("sw.js").catch(function(){});</script>
 </body>
