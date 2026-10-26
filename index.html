@@ -237,7 +237,7 @@ function LIDS(lg){lg=lg||(S&&S.lg)||"nba";return IDS.filter(function(i){return T
 var BASE={},ORDER=[],RANKL={},LSIZE={},LGL={};
 function injMap(){return (S&&S.inj)||{}}
 function ikey(id,p){return p.name}
-function healthy(id){var m=injMap(),RS=(S&&S.rush)||{},RT=(S&&S.rest)||{},mine=S&&id===S.my;var a=TEAMS[id].pl.filter(function(p){return !(m[ikey(id,p)]>0)});var b=a.filter(function(p){return mine?!RT[p.name]:enOf(p.name)>=35});if(b.length>=(mine?5:8))a=b;return a.map(function(p){return RS[p.name]?{name:p.name,pos:p.pos,off:p.off-6,def:p.def-6}:p})}
+function healthy(id){var m=injMap(),RS=(S&&S.rush)||{},RT=(S&&S.rest)||{},mine=S&&id===S.my;var a=TEAMS[id].pl.filter(function(p){return !(m[ikey(id,p)]>0)});var b=a.filter(function(p){return mine?!RT[p.name]:enOf(p.name)>=35});if(b.length>=(mine?5:8))a=b;a=gre62(id,a);return a.map(function(p){return RS[p.name]?{name:p.name,pos:p.pos,off:p.off-6,def:p.def-6}:p})}
 function calcStr(id,list){
   var p=(list||healthy(id).map(function(x){var f=(0.8+0.2*enOf(x.name)/100)*(S&&id===S.my?morF(x.name)*tacF():1);return {off:x.off*f,def:x.def*f}})).slice(),o=0,d=0,bo=0,bd=0,i;
   while(p.length<8)p.push({off:55,def:55});
@@ -274,7 +274,42 @@ function load(){try{var s=localStorage.getItem(KEY);if(s){var o=JSON.parse(s);if
 function tier(id){var f=RANKL[id]/LSIZE[TEAMS[id].lg];return f<=0.2?"Candidato al título":f<=0.55?"Pelea playoffs":f<=0.8?"Equipo en construcción":"Reconstrucción"}
 function confName(c){return GNAME[c]||c}
 function confPhrase(c){return GPHRASE[c]||"en la liga"}
-function deadline(){return Math.floor(S.sched.length*0.7)}
+function deadline(){return Math.floor(S.sched.length*(S.fv===2?(S.lg==="nba"?0.6:0.75):0.7))}
+/* ---------- Reglas de fichajes reales (v37) ---------- */
+function midR(){return S.fv===2?Math.floor(S.sched.length*0.5):deadline()}
+function tradeOpen(){return S.phase==="reg"&&S.rnd<=deadline()}
+function rMax(){return S&&S.lg==="nba"?15:12}
+/* NBA: tope blando, impuesto de lujo, tope duro (apron) y excepción de nivel medio */
+function capL(){var b=S.bud[S.my];return {cap:b,tax:Math.round(b*1.2),apr:Math.round(b*1.3),mle:Math.max(2,Math.round(b*0.08))}}
+function mleLeft(){if(S.lg!=="nba"||S.mle===S.season)return 0;var L=capL(),pr=payroll(S.my);return Math.max(0,Math.min(L.mle,L.apr-pr))}
+function salRoom(){var r=S.bud[S.my]-payroll(S.my);return S.lg==="nba"?Math.max(r,mleLeft()):r}
+function mleMark(pr0,sal){if(S.lg==="nba"&&pr0+sal>S.bud[S.my])S.mle=S.season}
+function luxTax(){if(S.lg!=="nba")return 0;var L=capL(),pr=payroll(S.my);return pr>L.tax?r1((pr-L.tax)*1.5):0}
+function nbaMatch(id,np,out,inc){
+  var b=S.bud[id];if(np<=b)return "";
+  if(np>b*1.3&&inc>out)return "tope";
+  if(inc>out*1.25+1)return "125";
+  return "";
+}
+function renBlock(n,ask){var np=payroll(S.my)-(S.sal[n]||0)+ask;return S.lg==="nba"?np>capL().apr*1.15:np>S.bud[S.my]}
+/* Grecia 6+2: hasta 8 extranjeros en la plantilla, pero solo 6 juegan cada partido */
+function gre62(id,a){if(!S||S.fv!==2||TEAMS[id].lg!=="gre"||!NATL)return a;var e=0;return a.filter(function(p){return isLocal(p.name,"gre")||++e<=6})}
+function greOut(id){var o={};if(!S||S.fv!==2||TEAMS[id].lg!=="gre"||!NATL)return o;var m=injMap(),e=0;TEAMS[id].pl.forEach(function(p){if(m[p.name]>0||isLocal(p.name,"gre"))return;if(++e>6)o[p.name]=1});return o}
+function greFill(){
+  if(S.fv!==2)return;var ch=false;
+  LIDS("gre").forEach(function(id){
+    if(id===S.my)return;var g=0;
+    var ok=function(){var pl=TEAMS[id].pl,l=pl.filter(function(p){return isLocal(p.name,"gre")}).length;return l+Math.min(6,pl.length-l)};
+    while(ok()<8&&TEAMS[id].pl.length<12&&g++<6){
+      var pool=faList("gre").filter(function(f){return isLocal(f.name,"gre")});
+      if(!pool.length){genFict(3,"gre");pool=faList("gre").filter(function(f){return isLocal(f.name,"gre")})}
+      if(!pool.length)break;
+      var f=pool[0];TEAMS[id].pl.push({name:f.name,pos:f.pos,off:f.off,def:f.def});
+      S.own[f.name]=id;S.sal[f.name]=f.ask;S.yrs[f.name]=f.yrs;sortTeam(id);ch=true;
+    }
+  });
+  if(ch){rebuildBase();refreshStr()}
+}
 
 /* ---------- Progresion y lesiones ---------- */
 var NEWS=[];
@@ -625,7 +660,7 @@ function newSeason(){
   LIDS().forEach(function(id){S.st[id]={w:0,l:0,pf:0,pa:0}});
   S.fv=2;S.spl=null;S.sched=makeSched();S.po=null;S.poWins=0;S.madePO=false;S.champ=null;S.fin=null;
   buildAllCups();S.evt=buildEvents();S.ei=0;
-  S.ps={};S.strk=0;S.wc=null;S.rush={};S.injq=[];S.en={};S.rest={};tbInit();morSeason();stInit();genYouth();boardStart();
+  S.ps={};S.strk=0;S.wc=null;S.rush={};S.injq=[];S.en={};S.rest={};tbInit();morSeason();stInit();genYouth();greFill();boardStart();
 }
 function sortIds(ids){
   return ids.slice().sort(function(a,b){
@@ -717,7 +752,7 @@ function commitMine0(pa,pb,opp){
     streak(pa>pb);
     if(S.rnd<deadline()&&Math.random()<(euroMkt()?0.25:0.1)){if(euroMkt())aiTransfer();else aiTrade()}
     if(S.rnd<deadline())makeOffer();
-    S.rnd++;schedFix();boardMid();if(S.rnd===deadline())trainMid();
+    S.rnd++;schedFix();boardMid();if(S.rnd===midR())trainMid();
     if(S.evt){S.ei++;advanceAuto()}else if(S.rnd>=S.sched.length)startPO();
   }else{
     var cp=commitPO(pa,pb,opp);
@@ -860,11 +895,12 @@ function showSelect(){
   $(h);
 }
 function rosterHTML(id,cut){
-  var h="",m=injMap();
+  var h="",m=injMap(),go=greOut(id);
   TEAMS[id].pl.forEach(function(p,i){
     var g=m[ikey(id,p)];
     var tag=g>0?' · <span class="lose">lesionado ('+g+')</span>':(i<5?' · titular':'');
     var rs=S.rest&&S.rest[p.name];
+    if(go[p.name])tag+=' · <span class="lose">no juega (cupo 6+2)</span>';
     if(cut&&!(g>0))tag+=' · energía <span class="'+enColor(enOf(p.name))+'">'+enOf(p.name)+'%</span>'+(rs?' · <b>descansa</b>':'')+' · ánimo '+morHTML(p.name);
     var btn=cut?'<br><button class="ghost" style="padding:4px 8px;min-height:30px;font-size:12px;margin-top:4px" onclick="cutPlayer('+i+')">'+(CUTARM===i?"Confirmar":"Cortar")+'</button>'+(canRest()&&!(g>0)?'<button class="ghost" style="padding:4px 8px;min-height:30px;font-size:12px;margin-top:4px" onclick="toggleRest('+i+')">'+(rs?"Que juegue":"Descansar")+'</button>':'')+(canTalk(p.name)?'<button class="ghost" style="padding:4px 8px;min-height:30px;font-size:12px;margin-top:4px" onclick="talkP('+i+')">Hablar</button>':''):'';
     h+='<div class="pl"><div><div class="n"'+(cut?' style="cursor:pointer;text-decoration:underline dotted" onclick="showPlayerT(\''+id+'\','+i+')"':'')+'>'+p.name+'</div><div class="s">'+p.pos+' · '+tagLabel(tagOf(null,p))+(S.pot&&S.pot[p.name]?' · canterano':ALL[p.name]&&(ALL[p.name].fict||ALL[p.name].inv)?' · ficticio':ALL[p.name]&&ALL[p.name].unc?' · sin confirmar':'')+tag+'</div></div><div class="s" style="text-align:right">ATQ '+p.off+'<br>DEF '+p.def+'<br>'+Math.round(S.sal[p.name]||0)+' M · '+(S.yrs[p.name]||1)+' a.'+btn+'</div></div>';
@@ -1060,7 +1096,7 @@ function showContracts(msg){
 }
 function renewC(i){
   var it=S.cx.list[i];
-  if(payroll(S.my)-(S.sal[it.name]||0)+it.ask>S.bud[S.my]){showContracts("No te entra en el tope de sueldos para renovar a "+it.name+".");return}
+  if(renBlock(it.name,it.ask)){showContracts("No te entra en el tope de sueldos para renovar a "+it.name+".");return}
   S.sal[it.name]=it.ask;S.yrs[it.name]=it.yrs;it.done="re";
   save();showContracts();
 }
@@ -1186,7 +1222,7 @@ function showDraftDone(){
   if(mine){
     h+='<div class="card offer"><h2>Tu novato</h2><p><b>'+mine.name+'</b> · pick #'+mine.pick+'</p><p class="muted">'+mine.pos+' · ATQ '+mine.off+' · DEF '+mine.def+' · '+rookieSal(mine.pick)+' M por 3 años</p></div>';
   }
-  if(TEAMS[S.my].pl.length>12)h+='<div class="card"><p>Tu plantilla tiene '+TEAMS[S.my].pl.length+' jugadores. Antes de empezar la temporada vas a tener que cortar a alguien.</p></div>';
+  if(TEAMS[S.my].pl.length>rMax())h+='<div class="card"><p>Tu plantilla tiene '+TEAMS[S.my].pl.length+' jugadores. Antes de empezar la temporada vas a tener que cortar a alguien.</p></div>';
   h+='<div class="card"><h2>Primeros picks</h2>'+d.picks.slice(0,8).map(function(x){return '<div class="gm'+(x.team===S.my?' mine':'')+'"><span>#'+x.pick+' '+TEAMS[x.team].name+'</span><span>'+x.name+'</span></div>'}).join("")+'</div>';
   h+='<button class="primary" onclick="endDraft()">Continuar</button>';
   $(h);
@@ -1252,9 +1288,19 @@ function playerVal(p){
 }
 function budBar(id){
   var pr=payroll(id),b=S.bud[id],pc=Math.min(100,Math.round(pr/b*100));
-  return '<div class="card"><div class="row"><span>Sueldos</span><b>'+Math.round(pr)+' / '+b+' M</b></div><div class="progress"><i style="width:'+pc+'%"></i></div><p class="muted" style="margin-top:8px">Plantilla: '+TEAMS[id].pl.length+' jugadores (mínimo 8, máximo 12). Los sueldos son estimados.</p></div>';
+  return '<div class="card"><div class="row"><span>Sueldos</span><b>'+Math.round(pr)+' / '+b+' M</b></div><div class="progress"><i style="width:'+pc+'%"></i></div><p class="muted" style="margin-top:8px">Plantilla: '+TEAMS[id].pl.length+' jugadores (mínimo 8, máximo '+(id===S.my?rMax():12)+'). Los sueldos son estimados.</p>'+(id===S.my&&S.lg==="nba"?nbaCapHTML():'')+'</div>';
 }
-function marketOpen(){return S.phase==="reg"&&S.rnd<=deadline()}
+function mktRule(){
+  if(S.fv!==2)return "El mercado cierra después de la fecha "+deadline()+".";
+  var R=S.sched.length;
+  if(S.lg==="nba")return "Los intercambios y fichajes con traspaso cierran después de la fecha "+deadline()+" de "+R+" (como el trade deadline de febrero). Los agentes libres se pueden fichar hasta el final de la fase regular. Plantilla de hasta 15 jugadores.";
+  return "El mercado cierra después de la fecha "+deadline()+" de "+R+", como el cierre real de fichajes de fines de febrero."+(S.lg==="gre"?" En Grecia rige la regla 6+2: hasta 8 extranjeros en la plantilla, pero solo 6 juegan cada partido.":"");
+}
+function nbaCapHTML(){
+  var L=capL(),ml=mleLeft(),lt=luxTax();
+  return '<p class="muted" style="margin-top:6px">Tope salarial (blando): '+L.cap+' M · impuesto de lujo desde '+L.tax+' M · tope duro: '+L.apr+' M.'+(ml?' Te queda la excepción de nivel medio: este año podés fichar un jugador de hasta '+Math.round(ml)+' M aunque no tengas lugar en el tope.':' Ya usaste la excepción de nivel medio de este año.')+(lt?' <b class="lose">Hoy pagarías '+fmtM(lt)+' de impuesto de lujo.</b>':'')+'</p>';
+}
+function marketOpen(){return S.phase==="reg"&&(S.fv===2&&S.lg==="nba"||S.rnd<=deadline())}
 function showMarket(){
   var h='<h1>Mercado</h1>';
   if(!marketOpen()){
@@ -1264,9 +1310,10 @@ function showMarket(){
   $(h+budBar(S.my)+
     (euroMkt()?tbBar()+'<button class="opt" onclick="showBuyTeams()"><b>Fichajes</b><span>Comprá jugadores de otros clubes pagando un traspaso</span></button>':'<button class="opt" onclick="showTradeTeams()"><b>Intercambios</b><span>Cambiá jugadores con otros equipos</span></button>')+
     '<button class="opt" onclick="showFA()"><b>Agentes libres</b><span>Fichá jugadores sin equipo</span></button>'+
-    '<p class="muted">El mercado cierra después de la fecha '+deadline()+'.'+(euroMkt()?' Las ofertas de otros clubes por tus jugadores aparecen en la pantalla principal.':'')+'</p><button class="primary" onclick="showHub()">Volver</button>');
+    '<p class="muted">'+mktRule()+(euroMkt()?' Las ofertas de otros clubes por tus jugadores aparecen en la pantalla principal.':'')+'</p><button class="primary" onclick="showHub()">Volver</button>');
 }
 function showTradeTeams(){
+  if(!tradeOpen()){showMarket();return}
   var h='<h1>Intercambios</h1><p class="muted">Elegí con qué equipo querés negociar.</p>';
   ORDER.forEach(function(id){
     if(id===S.my||TEAMS[id].lg!==S.lg)return;
@@ -1306,8 +1353,11 @@ function proposeTrade(){
   var vw=sum(want.map(playerVal)),vg=sum(give.map(playerVal));
   var sw=sum(want.map(function(p){return S.sal[p.name]})),sg=sum(give.map(function(p){return S.sal[p.name]}));
   var myNew=payroll(S.my)-sg+sw,aiNew=payroll(TR.id)-sw+sg,msg="";
-  if(myNew>S.bud[S.my]&&sw>sg)msg="Te pasás de tu tope de sueldos.";
-  else if(aiNew>S.bud[TR.id]&&sg>sw)msg="Ese equipo se pasaría de su tope de sueldos.";
+  var mr=nbaMatch(S.my,myNew,sg,sw),ar=nbaMatch(TR.id,aiNew,sw,sg);
+  if(!tradeOpen())msg="Ya pasó la fecha límite de cambios.";
+  else if(mr==="tope")msg="Te pasarías del tope duro ("+capL().apr+" M): por encima de ese número no podés recibir más sueldo del que das.";
+  else if(mr==="125")msg="Estás por encima del tope salarial: el sueldo que recibís no puede superar en más de 25% al que das ("+Math.round(sg)+" M → máximo "+Math.round(sg*1.25+1)+" M).";
+  else if(ar)msg="Ese equipo quedaría por encima del tope salarial: el sueldo que recibe no puede superar en más de 25% al que da.";
   else if(vg<vw*1.12)msg="No aceptan: piden más valor por lo que pedís.";
   if(msg){TR.msg=msg;showTrade(true);return}
   want.forEach(function(p){t.pl.splice(t.pl.indexOf(p),1);mine.push(p);S.own[p.name]=S.my});
@@ -1332,7 +1382,7 @@ function faList(lg){
 }
 function showFA(msg){
   FAL=faList();
-  var full=TEAMS[S.my].pl.length>=12,left=S.bud[S.my]-payroll(S.my);
+  var full=TEAMS[S.my].pl.length>=rMax(),left=salRoom();
   var h='<h1>Agentes libres</h1>'+budBar(S.my);
   if(msg)h+='<div class="card offer"><p>'+msg+'</p></div>';
   FAL.forEach(function(f,i){
@@ -1345,8 +1395,8 @@ function showFA(msg){
 function signFA(i){
   var f=FAL[i];
   if(!f)return;
-  if(TEAMS[S.my].pl.length>=12){showFA("Tu plantilla ya tiene 12 jugadores. Cortá a alguno primero.");return}
-  if(f.ask>S.bud[S.my]-payroll(S.my)){showFA("No te alcanza el tope de sueldos.");return}
+  if(TEAMS[S.my].pl.length>=rMax()){showFA("Tu plantilla ya tiene "+rMax()+" jugadores. Cortá a alguno primero.");return}
+  if(f.ask>salRoom()){showFA("No te alcanza el tope de sueldos.");return}
   TEAMS[S.my].pl.push({name:f.name,pos:f.pos,off:f.off,def:f.def});
   S.own[f.name]=S.my;S.sal[f.name]=f.ask;S.yrs[f.name]=f.yrs;
   sortTeam(S.my);rebuildBase();refreshStr();addNews("Fichaste a "+f.name+" como agente libre.","mer");save();
@@ -1787,7 +1837,7 @@ function scoutY(i){
 function promoteY(i){
   var Y=S.youth,y=Y&&Y.list[i];
   if(!y||y.up)return;
-  if(TEAMS[S.my].pl.length>=12){showYouth("Tu plantilla ya tiene 12 jugadores. Cortá a alguno desde Plantilla primero.");return}
+  if(TEAMS[S.my].pl.length>=rMax()){showYouth("Tu plantilla ya tiene "+rMax()+" jugadores. Cortá a alguno desde Plantilla primero.");return}
   if(payroll(S.my)+1>S.bud[S.my]){showYouth("No te alcanza el tope de sueldos para subirlo.");return}
   S.fict[y.name]={pos:y.pos,off:y.off,def:y.def,lg:S.lg};S.tag[y.name]="J";S.pot[y.name]=y.pot;
   ALL[y.name]={name:y.name,pos:y.pos,off:y.off,def:y.def,home:"FA",fict:true,lg:S.lg};
@@ -1881,7 +1931,7 @@ function trSp(i){
 }
 function showTraining(keep){
   var T=trState();
-  var h='<h1>Entrenamiento</h1><p class="muted">El foco del equipo cambia cuánto progresa cada jugador al terminar la temporada. En la fecha '+(S.sched?deadline():'-')+' hay un entrenamiento de mitad de año que también puede mejorar a algunos.</p><h2 style="margin-top:12px">Foco del equipo</h2>';
+  var h='<h1>Entrenamiento</h1><p class="muted">El foco del equipo cambia cuánto progresa cada jugador al terminar la temporada. En la fecha '+(S.sched?midR():'-')+' hay un entrenamiento de mitad de año que también puede mejorar a algunos.</p><h2 style="margin-top:12px">Foco del equipo</h2>';
   Object.keys(TRF).forEach(function(k){h+='<button class="opt'+(T.f===k?' sel':'')+'" onclick="setTrF(\''+k+'\')"><b>'+TRF[k][0]+'</b><span>'+TRF[k][1]+'</span></button>'});
   h+='<h2 style="margin-top:12px">Entrenamiento individual</h2><p class="muted">Elegí hasta 2 jugadores para trabajar aparte: progresan bastante más.</p>';
   TEAMS[S.my].pl.forEach(function(p,i){h+='<button class="opt'+(T.sp.indexOf(p.name)>=0?' sel':'')+'" onclick="trSp('+i+')"><b>'+p.name+'</b><span>'+p.pos+' · '+tagLabel(tagOf(null,p))+' · ATQ '+p.off+' · DEF '+p.def+'</span></button>'});
@@ -2014,7 +2064,7 @@ function showBuyTeams(){
 var BUYID=null;
 function showBuy(id,msg,keep){
   BUYID=id;S.noneg=S.noneg||{};
-  var t=TEAMS[id],tb=S.tb[S.my]||0,room=S.bud[S.my]-payroll(S.my),full=TEAMS[S.my].pl.length>=12,m=injMap();
+  var t=TEAMS[id],tb=S.tb[S.my]||0,room=salRoom(),full=TEAMS[S.my].pl.length>=rMax(),m=injMap();
   var h='<h1>'+t.name+'</h1>'+tbBar()+budBar(S.my);
   if(msg)h+='<div class="card offer"><p>'+msg+'</p></div>';
   h+='<p class="muted">Pagando el precio pedido, el club acepta. Una oferta un 20% más baja puede salir bien o no; si la rechazan, no podés volver a regatear por ese jugador hasta la próxima fecha. Sus dos mejores jugadores cuestan más.</p>';
@@ -2027,13 +2077,13 @@ function showBuy(id,msg,keep){
       '<div class="two" style="margin-top:8px"><button class="primary" style="font-size:15px;padding:10px" '+(ok&&tb>=pr?'':'disabled ')+' onclick="buyP('+i+',false)">Pagar '+pr+' M</button>'+
       (lo<pr?'<button class="ghost" '+(ok&&tb>=lo&&!neg?'':'disabled')+' onclick="buyP('+i+',true)">Ofrecer '+lo+' M</button>':'')+'</div></div>';
   });
-  if(full)h+='<p class="muted">Tu plantilla ya tiene 12 jugadores: cortá a alguno para poder fichar.</p>';
+  if(full)h+='<p class="muted">Tu plantilla ya tiene '+rMax()+' jugadores: cortá a alguno para poder fichar.</p>';
   $(h+'<button class="ghost" onclick="showBuyTeams()">Volver</button>',keep);
 }
 function buyP(i,low){
-  var id=BUYID,t=TEAMS[id],p=t.pl[i];if(!p||!marketOpen())return;
+  var id=BUYID,t=TEAMS[id],p=t.pl[i];if(!p||!tradeOpen())return;var pr0=payroll(S.my);
   var pr=price(id,p),amt=low?Math.max(1,Math.round(pr*0.8)):pr,sal=S.sal[p.name]||0;
-  if(TEAMS[S.my].pl.length>=12){showBuy(id,"Tu plantilla ya tiene 12 jugadores.");return}
+  if(TEAMS[S.my].pl.length>=rMax()){showBuy(id,"Tu plantilla ya tiene "+rMax()+" jugadores.");return}
   if(t.pl.length<=8){showBuy(id,t.name+" no puede quedarse con menos de 8 jugadores.");return}
   if(payroll(S.my)+sal>S.bud[S.my]){showBuy(id,"El sueldo de "+p.name+" no entra en tu tope.");return}
   if((S.tb[S.my]||0)<amt){showBuy(id,"No te alcanza el presupuesto de fichajes.");return}
@@ -2144,13 +2194,14 @@ function showMarket(){
   FROMSR=false;
   $(h+budBar(S.my)+tbBar()+extBar(S.my)+
     '<button class="opt" onclick="showSearch()"><b>Buscador</b><span>Filtrá por posición, ataque, defensa, sueldo, traspaso y más</span></button>'+
-    '<button class="opt" onclick="showBuyTeams()"><b>Fichajes</b><span>'+(euroMkt()?'Comprá jugadores de cualquier liga pagando un traspaso':'Traé jugadores de otras ligas pagando un traspaso')+'</span></button>'+
-    (euroMkt()?'':'<button class="opt" onclick="showTradeTeams()"><b>Intercambios</b><span>Cambiá jugadores con otros equipos de la NBA</span></button>')+
+    (tradeOpen()?'<button class="opt" onclick="showBuyTeams()"><b>Fichajes</b><span>'+(euroMkt()?'Comprá jugadores de cualquier liga pagando un traspaso':'Traé jugadores de otras ligas pagando un traspaso')+'</span></button>'+
+    (euroMkt()?'':'<button class="opt" onclick="showTradeTeams()"><b>Intercambios</b><span>Cambiá jugadores con otros equipos de la NBA</span></button>'):'<div class="card"><p>Pasó la fecha límite de cambios (fecha '+deadline()+'): ya no hay intercambios ni fichajes con traspaso. Los agentes libres se pueden fichar hasta el final de la fase regular.</p></div>')+
     '<button class="opt" onclick="showFA()"><b>Agentes libres</b><span>Fichá jugadores sin equipo de cualquier liga</span></button>'+
-    '<p class="muted">El mercado cierra después de la fecha '+deadline()+'. Los jugadores de ligas más fuertes piden más sueldo para venir, y los mejores pueden no querer. Tu reputación ayuda.'+(euroMkt()?' Las ofertas de otros clubes por tus jugadores aparecen en la pantalla principal.':'')+'</p><button class="primary" onclick="showHub()">Volver</button>');
+    '<p class="muted">'+mktRule()+' Los jugadores de ligas más fuertes piden más sueldo para venir, y los mejores pueden no querer. Tu reputación ayuda.'+(euroMkt()?' Las ofertas de otros clubes por tus jugadores aparecen en la pantalla principal.':'')+'</p><button class="primary" onclick="showHub()">Volver</button>');
 }
 var BUYLG=null;
 function showBuyTeams(lg){
+  if(!tradeOpen()){showMarket();return}
   var L=buyLgs();lg=lg||BUYLG;if(L.indexOf(lg)<0)lg=L[0];BUYLG=lg;tbFill();
   var h='<h1>Fichajes</h1>'+tbBar()+lgTabs("showBuyTeams",lg,L)+'<p class="muted">Elegí de qué club querés comprar.</p>';
   ORDER.forEach(function(id){
@@ -2168,7 +2219,7 @@ function buyTerms(id,p){
 }
 function showBuy(id,msg,keep){
   BUYID=id;S.noneg=S.noneg||{};tbFill();
-  var t=TEAMS[id],tb=S.tb[S.my]||0,room=S.bud[S.my]-payroll(S.my),full=TEAMS[S.my].pl.length>=12,m=injMap(),other=t.lg!==S.lg;
+  var t=TEAMS[id],tb=S.tb[S.my]||0,room=salRoom(),full=TEAMS[S.my].pl.length>=rMax(),m=injMap(),other=t.lg!==S.lg;
   var h='<h1>'+t.name+'</h1>'+(other?'<p class="muted" style="margin:0 0 10px">'+LSHORT[t.lg]+'</p>':'')+tbBar()+budBar(S.my)+extBar(S.my);
   if(msg)h+='<div class="card offer"><p>'+msg+'</p></div>';
   h+='<p class="muted">Pagando el precio pedido, el club acepta. Una oferta un 20% más baja puede salir bien o no; si la rechazan, no podés volver a regatear por ese jugador hasta la próxima fecha. Sus dos mejores jugadores cuestan más.'+(other?' Al venir de otra liga, el jugador firma un contrato nuevo con tu club.':'')+'</p>';
@@ -2184,17 +2235,17 @@ function showBuy(id,msg,keep){
       (bt.ok?'<div class="two" style="margin-top:8px"><button class="primary" style="font-size:15px;padding:10px" '+(ok&&tb>=pr?'':'disabled ')+' onclick="buyP('+i+',false)">Pagar '+pr+' M</button>'+
       (lo<pr?'<button class="ghost" '+(ok&&tb>=lo&&!neg?'':'disabled')+' onclick="buyP('+i+',true)">Ofrecer '+lo+' M</button>':'')+'</div>':'')+'</div>';
   });
-  if(full)h+='<p class="muted">Tu plantilla ya tiene 12 jugadores: cortá a alguno para poder fichar.</p>';
+  if(full)h+='<p class="muted">Tu plantilla ya tiene '+rMax()+' jugadores: cortá a alguno para poder fichar.</p>';
   $(h+'<button class="ghost" onclick="'+(FROMSR?'showSearch()':'showBuyTeams(\''+t.lg+'\')')+'">Volver</button>',keep);
 }
 function buyP(i,low){
-  var id=BUYID,t=TEAMS[id],p=t.pl[i];if(!p||!marketOpen())return;
+  var id=BUYID,t=TEAMS[id],p=t.pl[i];if(!p||!tradeOpen())return;var pr0=payroll(S.my);
   var pr=price(id,p),amt=low?Math.max(1,Math.round(pr*0.8)):pr,bt=buyTerms(id,p);
   if(!bt.ok){showBuy(id,p.name+": "+bt.why);return}
-  if(TEAMS[S.my].pl.length>=12){showBuy(id,"Tu plantilla ya tiene 12 jugadores.");return}
+  if(TEAMS[S.my].pl.length>=rMax()){showBuy(id,"Tu plantilla ya tiene "+rMax()+" jugadores.");return}
   if(!capOK(S.my,p.name)){showBuy(id,capMsg());return}
   if(t.pl.length<=8){showBuy(id,t.name+" no puede quedarse con menos de 8 jugadores.");return}
-  if(payroll(S.my)+bt.sal>S.bud[S.my]){showBuy(id,"El sueldo de "+p.name+" no entra en tu tope.");return}
+  if(bt.sal>salRoom()){showBuy(id,"El sueldo de "+p.name+" no entra en tu tope.");return}
   if((S.tb[S.my]||0)<amt){showBuy(id,"No te alcanza el presupuesto de fichajes.");return}
   if(low){
     S.noneg=S.noneg||{};
@@ -2203,6 +2254,7 @@ function buyP(i,low){
   }
   t.pl.splice(i,1);TEAMS[S.my].pl.push(p);S.own[p.name]=S.my;morSet(p.name,72);
   if(!bt.keep){S.sal[p.name]=bt.sal;S.yrs[p.name]=bt.yrs;setLg(p.name,S.lg);if(S.en)delete S.en[p.name]}
+  mleMark(pr0,S.sal[p.name]||0);
   S.tb[S.my]-=amt;S.tb[id]=(S.tb[id]||0)+amt;
   sortTeam(S.my);sortTeam(id);rebuildBase();refreshStr();
   addNews("Fichaste a "+p.name+" de "+t.name+(bt.keep?"":" ("+LSHORT[t.lg]+")")+" por "+amt+" M.","mer");save();
@@ -2275,7 +2327,7 @@ function showFA(msg,lg){
   var L=PLAYLG().filter(function(x){return LP[x]});
   lg=lg||FALG||S.lg;if(L.indexOf(lg)<0)lg=S.lg;FALG=lg;
   FAL=faList(lg,true);
-  var full=TEAMS[S.my].pl.length>=12,left=S.bud[S.my]-payroll(S.my);
+  var full=TEAMS[S.my].pl.length>=rMax(),left=salRoom();
   var h='<h1>Agentes libres</h1>'+budBar(S.my)+lgTabs("showFAlg",lg,L);
   if(msg)h+='<div class="card offer"><p>'+msg+'</p></div>';
   if(lg!==S.lg)h+='<p class="muted">Jugadores libres de '+LSHORT[lg]+'. Si vienen de una liga más fuerte, piden más sueldo.</p>';
@@ -2292,8 +2344,8 @@ function signFA(i){
   var f=FAL[i];
   if(!f)return;
   if(f.no){showFA(f.name+": "+f.no);return}
-  if(TEAMS[S.my].pl.length>=12){showFA("Tu plantilla ya tiene 12 jugadores. Cortá a alguno primero.");return}
-  if(f.ask>S.bud[S.my]-payroll(S.my)){showFA("No te alcanza el tope de sueldos.");return}
+  if(TEAMS[S.my].pl.length>=rMax()){showFA("Tu plantilla ya tiene "+rMax()+" jugadores. Cortá a alguno primero.");return}
+  if(f.ask>salRoom()){showFA("No te alcanza el tope de sueldos.");return}
   TEAMS[S.my].pl.push({name:f.name,pos:f.pos,off:f.off,def:f.def});
   S.own[f.name]=S.my;S.sal[f.name]=f.ask;S.yrs[f.name]=f.yrs;
   if(f.lg!==S.lg)setLg(f.name,S.lg);
@@ -2350,7 +2402,7 @@ function startContracts(){
 function lowAsk(it){return Math.max(1,Math.round(it.ask*0.85))}
 function showContracts(msg){
   var cx=S.cx,open=0;
-  var h='<h1>Contratos que vencen</h1><p class="muted">Decidí si renovás a cada jugador o lo dejás ir. Podés intentar una oferta un 15% más baja: si está contento es más fácil que acepte; si la rechaza, pide más.</p>'+budBar(S.my);
+  var h='<h1>Contratos que vencen</h1><p class="muted">Decidí si renovás a cada jugador o lo dejás ir. Podés intentar una oferta un 15% más baja: si está contento es más fácil que acepte; si la rechaza, pide más.'+(S.lg==="nba"?' En la NBA podés renovar a tus propios jugadores aunque te pases del tope salarial (derechos Bird), pero si superás la línea del impuesto de lujo el club paga extra.':'')+'</p>'+budBar(S.my);
   if(msg)h+='<div class="card offer"><p>'+msg+'</p></div>';
   cx.list.forEach(function(it,i){
     var a=ALL[it.name],r=ratingOf(it.name),tag=tagOf(null,a),cur=S.sal[it.name]||0,lo=lowAsk(it);
@@ -2367,14 +2419,14 @@ function showContracts(msg){
 }
 function renewC(i){
   var it=S.cx.list[i];if(!it||it.done)return;
-  if(payroll(S.my)-(S.sal[it.name]||0)+it.ask>S.bud[S.my]){showContracts("No te entra en el tope de sueldos para renovar a "+it.name+".");return}
+  if(renBlock(it.name,it.ask)){showContracts("No te entra en el tope de sueldos para renovar a "+it.name+".");return}
   S.sal[it.name]=it.ask;S.yrs[it.name]=it.yrs;it.done="re";morSet(it.name,morOf(it.name)+8);
   save();showContracts();
 }
 function offerC(i){
   var it=S.cx.list[i];if(!it||it.done||it.neg)return;
   var lo=lowAsk(it);
-  if(payroll(S.my)-(S.sal[it.name]||0)+lo>S.bud[S.my]){showContracts("No te entra en el tope de sueldos para renovar a "+it.name+".");return}
+  if(renBlock(it.name,lo)){showContracts("No te entra en el tope de sueldos para renovar a "+it.name+".");return}
   var pr=0.2+morOf(it.name)/160;
   if(Math.random()<pr){
     S.sal[it.name]=lo;S.yrs[it.name]=it.yrs;it.done="re";morSet(it.name,morOf(it.name)+3);
@@ -2390,7 +2442,7 @@ function showFA(msg,lg){
   var L=PLAYLG().filter(function(x){return LP[x]});
   lg=lg||FALG||S.lg;if(L.indexOf(lg)<0)lg=S.lg;FALG=lg;S.noneg=S.noneg||{};
   FAL=faList(lg,true);
-  var full=TEAMS[S.my].pl.length>=12,left=S.bud[S.my]-payroll(S.my);
+  var full=TEAMS[S.my].pl.length>=rMax(),left=salRoom();
   var h='<h1>Agentes libres</h1>'+budBar(S.my)+extBar(S.my)+lgTabs("showFAlg",lg,L);
   if(msg)h+='<div class="card offer"><p>'+msg+'</p></div>';
   h+='<p class="muted">'+(lg!==S.lg?'Jugadores libres de '+LSHORT[lg]+'. Si vienen de una liga más fuerte, piden más sueldo. ':'')+'Podés ofrecer un 15% menos de lo que piden: a veces aceptan; si no, esperá a la próxima fecha para volver a intentar.</p>';
@@ -2408,14 +2460,15 @@ function signFA(i,low){
   if(!f)return;
   if(f.no){showFA(f.name+": "+f.no);return}
   var amt=low?Math.max(1,Math.round(f.ask*0.85)):f.ask;
-  if(TEAMS[S.my].pl.length>=12){showFA("Tu plantilla ya tiene 12 jugadores. Cortá a alguno primero.");return}
+  if(TEAMS[S.my].pl.length>=rMax()){showFA("Tu plantilla ya tiene "+rMax()+" jugadores. Cortá a alguno primero.");return}
   if(!capOK(S.my,f.name)){showFA(capMsg());return}
-  if(amt>S.bud[S.my]-payroll(S.my)){showFA("No te alcanza el tope de sueldos.");return}
+  if(amt>salRoom()){showFA("No te alcanza el tope de sueldos.");return}
   if(low){
     S.noneg=S.noneg||{};
     if(S.noneg["fa:"+f.name]===S.rnd)return;
     if(Math.random()>0.5){S.noneg["fa:"+f.name]=S.rnd;save();showFA(f.name+" rechazó tu oferta de "+amt+" M.");return}
   }
+  mleMark(payroll(S.my),amt);
   TEAMS[S.my].pl.push({name:f.name,pos:f.pos,off:f.off,def:f.def});
   S.own[f.name]=S.my;S.sal[f.name]=amt;S.yrs[f.name]=f.yrs;morSet(f.name,72);
   if(f.lg!==S.lg)setLg(f.name,S.lg);
@@ -2461,6 +2514,7 @@ function finSeasonEnd(){
   (S.fin&&S.fin.cups||[]).forEach(function(c){cb+=c.b||0});
   var pr=K*(0.03*(S.poWins||0)+(S.champ===S.my?0.06:0)+0.01*cb+(S.fin&&S.fin.wc?0.01*(S.fin.wc.b||0):0));
   if(pr>0){F.prize+=pr;S.tb[S.my]=r1((S.tb[S.my]||0)+pr)}
+  var lt=luxTax();if(lt>0){F.tax=lt;S.tb[S.my]=r1((S.tb[S.my]||0)-lt);addNews("El club pagó "+fmtM(lt)+" de impuesto de lujo por terminar la temporada con "+Math.round(payroll(S.my))+" M en sueldos (la línea es "+capL().tax+" M).","dir")}
   var cash=S.tb[S.my]||0;
   if(cash<0){
     S.rep=clamp(S.rep-3,0,100);S.bud[S.my]=Math.round(S.bud[S.my]*0.96);
@@ -2474,12 +2528,12 @@ function setTix(k){S.tix=k;save();showFinance()}
 function showFinance(){
   fyFix();
   var F=S.fy,K=finK(),R=S.sched.length||1,cash=S.tb[S.my]||0;
-  var tr=cash-(F.start+F.tv+F.sp+F.gate+F.prize-F.sal-(F.st||0));
+  var tr=cash-(F.start+F.tv+F.sp+F.gate+F.prize-F.sal-(F.st||0)-(F.tax||0));
   var row=function(a,v,c){return '<div class="gm"><span>'+a+'</span><b'+(c?' class="'+c+'"':'')+'>'+fmtM(v)+'</b></div>'};
   var h='<h1>Finanzas</h1><div class="card"><div class="row"><span>Caja del club</span><b class="'+(cash<0?"lose":"")+'">'+fmtM(cash)+'</b></div><p class="muted" style="margin-top:6px">Con esta plata pagás traspasos. Entra por entradas, sponsors, TV y premios; salen los sueldos. Si la temporada termina con la caja en negativo, la directiva se enoja.</p></div>';
-  h+='<div class="card"><h2>Esta temporada</h2>'+row("Al empezar",F.start)+row("Entradas ("+F.home+(F.home===1?" partido":" partidos")+" de local)",F.gate,"win")+row("Sponsors",F.sp,"win")+row("Televisión",F.tv,"win")+(F.prize?row("Premios",F.prize,"win"):"")+row("Sueldos",-F.sal,"lose")+(F.st?row("Cuerpo técnico",-F.st,"lose"):"")+(Math.abs(tr)>=0.5?row("Traspasos",tr,tr>=0?"win":"lose"):"")+'</div>';
+  h+='<div class="card"><h2>Esta temporada</h2>'+row("Al empezar",F.start)+row("Entradas ("+F.home+(F.home===1?" partido":" partidos")+" de local)",F.gate,"win")+row("Sponsors",F.sp,"win")+row("Televisión",F.tv,"win")+(F.prize?row("Premios",F.prize,"win"):"")+row("Sueldos",-F.sal,"lose")+(F.st?row("Cuerpo técnico",-F.st,"lose"):"")+(F.tax?row("Impuesto de lujo",-F.tax,"lose"):"")+(Math.abs(tr)>=0.5?row("Traspasos",tr,tr>=0?"win":"lose"):"")+'</div>';
   var sal=payroll(S.my),inc=0.32*K+0.3*K*(0.7+0.6*S.rep/100)+0.38*K*fillOf()*TIX[S.tix||"n"].m;
-  h+='<div class="card"><h2>Previsión</h2><p class="muted">Si todo sigue igual, en una temporada entran unos '+fmtM(inc)+' y se pagan '+fmtM(sal)+' de sueldos'+(stCost()?' y '+fmtM(stCost())+' de cuerpo técnico':'')+'.</p></div>';
+  h+='<div class="card"><h2>Previsión</h2><p class="muted">Si todo sigue igual, en una temporada entran unos '+fmtM(inc)+' y se pagan '+fmtM(sal)+' de sueldos'+(stCost()?' y '+fmtM(stCost())+' de cuerpo técnico':'')+(luxTax()?'. Además, al final de la temporada pagarías '+fmtM(luxTax())+' de impuesto de lujo':'')+'.</p></div>';
   h+='<div class="card"><h2>Precio de las entradas</h2><div class="three">'+Object.keys(TIX).map(function(k){return '<button class="ghost tab'+((S.tix||"n")===k?' on':'')+'" onclick="setTix(\''+k+'\')">'+TIX[k].n+'</button>'}).join("")+'</div>'+
     '<p class="muted" style="margin-top:8px">Entradas baratas llenan más el estadio; caras dejan más plata si el equipo gana y tiene buena reputación. Con el precio actual se espera un '+Math.round(fillOf()*100)+'% de estadio'+(F.fill!=null?' (último partido de local: '+F.fill+'%)':'')+'.</p></div>';
   $(h+'<button class="primary" onclick="showHub()">Volver</button>');
@@ -3291,15 +3345,15 @@ function extTag(n){return isExt(n)?' <span class="pill" style="font-size:11px;pa
 function extBar(id){
   var lg=TEAMS[id].lg,c=CAPX[lg];if(!c)return "";
   var n=extN(id);
-  return '<div class="card" style="padding:10px 14px"><div class="row"><span>Extranjeros</span><b class="'+(n>c?"lose":"")+'">'+n+' / '+c+'</b></div><p class="muted" style="margin:4px 0 0;font-size:13px">En '+LSHORT[lg]+' se pueden tener hasta '+c+' extranjeros en la plantilla. Los juveniles del club cuentan como locales.'+(n>c?' Tu plantilla ya está pasada: no podés sumar más extranjeros.':'')+'</p></div>';
+  return '<div class="card" style="padding:10px 14px"><div class="row"><span>Extranjeros</span><b class="'+(n>c?"lose":"")+'">'+n+' / '+c+'</b></div><p class="muted" style="margin:4px 0 0;font-size:13px">En '+LSHORT[lg]+' se pueden tener hasta '+c+' extranjeros en la plantilla. Los juveniles del club cuentan como locales.'+(lg==="gre"&&S.fv===2?' Regla 6+2: solo 6 extranjeros pueden jugar cada partido; si tenés más sanos, los más flojos se quedan afuera.':'')+(n>c?' Tu plantilla ya está pasada: no podés sumar más extranjeros.':'')+'</p></div>';
 }
 
 var SF={w:"all",lg:"all",pos:"all",off:0,def:0,age:"all",sal:0,fee:0,nat:"all",aff:false,sort:"lvl",n:30};
 var SRL=[],FROMSR=false;
 var POSN={PG:"Base",SG:"Escolta",SF:"Alero",PF:"Ala-pívot",C:"Pívot"};
 function srCollect(){
-  var r=[],tb=S.tb[S.my]||0,room=S.bud[S.my]-payroll(S.my),full=TEAMS[S.my].pl.length>=12,m=injMap();
-  if(SF.w!=="fa")buyLgs().forEach(function(lg){
+  var r=[],tb=S.tb[S.my]||0,room=salRoom(),full=TEAMS[S.my].pl.length>=rMax(),m=injMap();
+  if(SF.w!=="fa"&&tradeOpen())buyLgs().forEach(function(lg){
     if(SF.lg!=="all"&&SF.lg!==lg)return;
     LIDS(lg).forEach(function(id){
       if(id===S.my)return;var t=TEAMS[id];
@@ -3364,15 +3418,15 @@ function showSearch(){
     srSel("sort","Ordenar por",[["lvl","Nivel"],["off","Ataque"],["def","Defensa"],["sal","Sueldo (menor)"],["fee","Traspaso (menor)"]])+
     '</div><label style="display:flex;gap:10px;align-items:center;margin-top:12px;font-size:15px"><input type="checkbox" style="width:22px;height:22px" '+(SF.aff?'checked ':'')+'onchange="srSet(\'aff\',this.checked)">Solo los que puedo fichar ahora</label>'+
     '<button class="ghost" style="margin-top:10px" onclick="srReset()">Borrar filtros</button></div>'+
-    tbBar()+'<div class="card" style="padding:10px 14px"><div class="row"><span>Lugar en el tope</span><b>'+Math.round(S.bud[S.my]-payroll(S.my))+' M</b></div><div class="row"><span>Plantilla</span><b>'+TEAMS[S.my].pl.length+' / 12</b></div>'+(CAPX[S.lg]?'<div class="row"><span>Extranjeros</span><b>'+extN(S.my)+' / '+CAPX[S.lg]+'</b></div>':'')+'</div>'+
+    tbBar()+'<div class="card" style="padding:10px 14px"><div class="row"><span>Lugar en el tope</span><b>'+Math.round(salRoom())+' M</b></div><div class="row"><span>Plantilla</span><b>'+TEAMS[S.my].pl.length+' / '+rMax()+'</b></div>'+(CAPX[S.lg]?'<div class="row"><span>Extranjeros</span><b>'+extN(S.my)+' / '+CAPX[S.lg]+'</b></div>':'')+'</div>'+
     '<div id="sres">'+srHTML()+'</div>';
   $(h+'<button class="ghost" onclick="FROMSR=false;showMarket()">Volver</button>');
 }
 function srHTML(){
   SRL=srCollect();
-  var full=TEAMS[S.my].pl.length>=12;
+  var full=TEAMS[S.my].pl.length>=rMax();
   var h='<p class="muted" style="margin:6px 0">'+(SRL.length?SRL.length+(SRL.length===1?' jugador encontrado':' jugadores encontrados'):'No hay jugadores con esos filtros.')+'</p>';
-  if(full&&SRL.length)h+='<p class="muted">Tu plantilla ya tiene 12 jugadores: cortá a alguno para poder fichar.</p>';
+  if(full&&SRL.length)h+='<p class="muted">Tu plantilla ya tiene '+rMax()+' jugadores: cortá a alguno para poder fichar.</p>';
   SRL.slice(0,SF.n).forEach(function(x,k){
     var lo=x.id?Math.max(1,Math.round(x.fee*0.8)):Math.max(1,Math.round(x.sal*0.85));
     var neg=S.noneg&&(x.id?S.noneg[x.name]===S.rnd:S.noneg["fa:"+x.name]===S.rnd);
@@ -3566,7 +3620,7 @@ function showSave(msg){
   PRECODE="";if(navigator.share&&S&&S.my){packState().then(function(c){PRECODE=c})}
 }
 /* El iPhone solo abre Compartir si se llama apenas se toca el botón: el código se arma antes, al abrir la pantalla */
-var PRECODE="",GAMEVER="36";
+var PRECODE="",GAMEVER="37";
 function shareCode(){
   if(!PRECODE){exportCode();return}
   navigator.share({title:"Partida Basket Manager",text:PRECODE}).then(function(){toast("Código enviado ✓")},function(e){if(!e||e.name!=="AbortError")exportCode()});
