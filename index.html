@@ -2459,7 +2459,7 @@ function showPlayerT(id,i,back){
   h+='<div class="card"><div class="gm"><span>Sueldo</span><b>'+Math.round(S.sal[p.name]||0)+' M · '+(S.yrs[p.name]||1)+((S.yrs[p.name]||1)===1?' año':' años')+'</b></div>'+
      (mine?'<div class="gm"><span>Ánimo</span><b>'+morHTML(p.name)+'</b></div><div class="gm"><span>Energía</span><b class="'+enColor(enOf(p.name))+'">'+enOf(p.name)+'%</b></div>':'')+
      (r&&r[0]?'<div class="gm"><span>Esta temporada</span><b>'+f1(r[1]/r[0])+' pts · '+f1(r[2]/r[0])+' reb · '+f1(r[3]/r[0])+' ast'+(r[6]?' · '+f1(r[5]/r[6])+' PIR':'')+'</b></div>':'')+'</div>';
-  h+='<p class="muted">El tiro mejora la estrategia de triples en los partidos en vivo; el juego interior, los tiros de dos. El pase suma asistencias y el rebote, rebotes.</p>';
+  h+='<p class="muted">El tiro mejora la táctica de triples en los partidos en vivo; el juego interior, los tiros de dos. El pase suma asistencias y el rebote, rebotes.</p>';
   $(h+'<button class="primary" onclick="'+bk+'">Volver</button>');
 }
 
@@ -2721,7 +2721,7 @@ function showLive(){
     '<button class="ghost" id="lvto" '+(M.tos>0?'':'disabled')+' style="padding:8px 4px" onclick="liveTO()">Tiempo muerto</button>'+
     '<button class="ghost" onclick="showBoxLive()">Planilla</button></div>'+
     '<div id="lvdec">'+decBar()+'</div>'+
-    '<div class="card"><h2 style="margin-bottom:6px">Estrategia</h2><div id="lvst" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">'+stratBtns()+'</div></div>'+
+    '<div class="card"><h2 style="margin-bottom:6px">Táctica</h2><div id="lvst">'+stratBtns()+'</div></div>'+
     '<div class="card"><h2>Jugadas</h2><div id="lvlog">'+liveLog()+'</div></div>'+
     '<div class="row" style="gap:8px"><span class="muted">Velocidad</span><button class="ghost" id="lvsp" style="width:auto;padding:8px 14px" onclick="liveSpd()">'+(S.spd==="r"?"Rápida":"Normal")+'</button><span style="flex:1"></span>'+sndBtn()+'</div>'+
     '<p class="muted" style="font-size:12px;margin-top:10px">Arriba los 5 en cancha. MIN minutos · F faltas · PIR valoración · EN energía · 🏀 con la pelota · 🔒 marca · 🎯 el rival que marcás · E eliminado. Los cambios los hace el asistente.</p>');
@@ -2764,14 +2764,14 @@ function bestOff(){return court().reduce(function(b,p){return eff(p,"off")>eff(b
 function checkDec(r){
   var half=M.i<=M.n/2?1:2,c=court(),st=M.opp.pl.filter(function(p){return p.name===M.opp.star})[0];
   if(M.dec)return;
-  if(r.op-r.my>=8&&!M.used["run"+half]){M.used["run"+half]=1;M.dec={k:"run",t:"Racha del rival",x:M.opp.name+" te hizo un parcial de "+r.op+"-"+r.my+".",o:[{l:"Tiempo muerto",d:M.tos>0?"Recupera energía y corta el ritmo del rival.":"No te quedan tiempos muertos.",dis:M.tos<=0},{l:"Defensa en zona",d:"El próximo tramo el rival ataca peor, pero tira más triples."},{l:"Arengar al equipo",d:"El próximo tramo tu equipo ataca con más energía."},{l:"Seguir igual",d:"Confiás en lo que venís haciendo."}]};return}
+  if(r.op-r.my>=8&&!M.used["run"+half]){M.used["run"+half]=1;M.dec={k:"run",t:"Racha del rival",x:M.opp.name+" te hizo un parcial de "+r.op+"-"+r.my+".",o:[{l:"Tiempo muerto",d:M.tos>0?"Recupera energía y corta el ritmo del rival.":"No te quedan tiempos muertos.",dis:M.tos<=0},{l:"Defensa en zona",d:"Pasás a Zona 2-3: cierra la pintura, pero deja tirar triples."},{l:"Arengar al equipo",d:"El próximo tramo tu equipo ataca con más energía."},{l:"Seguir igual",d:"Confiás en lo que venís haciendo."}]};return}
   if(st&&st.pts>=(M.n===6?14:11)&&M.i<M.n-1&&!M.used.star&&!(M.opp.mk===st.name&&(M.dbl||onCourt(M.stop)))){M.used.star=1;var bd=bestDef(st);M.dec={k:"star",t:"La figura rival está encendida",x:sn(st.name)+" ya lleva "+st.pts+" puntos.",o:[{l:"Marcarlo con "+sn(bd.name),d:bd.pos+", defensa individual "+bd.a.dfn+": el mejor de tu quinteto para su posición.",p:bd.name},{l:"Doble marca",d:"Lo encimás entre dos: tira menos, pero sus compañeros quedan más libres para el triple."},{l:"Seguir igual",d:"No cambiás la defensa."}]};return}
   if(M.i>=1&&M.i<M.n-1){var hp=oppCourt().filter(function(p){return oppHot(p)>=6&&!M.used["mk"+p.name]&&!(M.opp.mk===p.name&&(M.dbl||onCourt(M.stop)))}).sort(function(a,b){return oppHot(b)-oppHot(a)})[0];
     if(hp){M.used["mk"+hp.name]=1;var bd2=bestDef(hp);M.dec={k:"mk",p:bd2.name,q:hp.name,t:sn(hp.name)+" está caliente",x:"Lleva "+oppHot(hp)+" puntos en los últimos minutos ("+hp.pts+" en total).",o:[{l:"Que lo marque "+sn(bd2.name),d:bd2.pos+", defensa individual "+bd2.a.dfn+". Le va a costar más tirar."},{l:"Doble marca",d:"Tira menos, pero sus compañeros quedan más libres."},{l:"Seguir igual",d:"No cambiás la defensa."}]};return}}
   var t3h=M.t3h||[],l3=t3h.length>=3?t3h[t3h.length-1]-t3h[t3h.length-3]:0;
-  if(l3>=3&&M.i<M.n-1&&M.strat!=="def"&&!M.used["t3"+half]){M.used["t3"+half]=1;M.dec={k:"t3",t:"Te están lastimando de triples",x:M.opp.name+" metió "+l3+" triples en los últimos minutos.",o:[{l:"Cerrar el perímetro",d:"Pasás a Defensa: les cuesta más tirar de afuera."},{l:"Seguir igual",d:"Confiás en que van a dejar de entrar."}]};return}
+  if(l3>=3&&M.i<M.n-1&&M.dstr!=="swi"&&!M.used["t3"+half]){M.used["t3"+half]=1;M.dec={k:"t3",t:"Te están lastimando de triples",x:M.opp.name+" metió "+l3+" triples en los últimos minutos.",o:[{l:"Cerrar el perímetro",d:"Pasás a cambiar en los bloqueos: les cuesta más tirar de afuera."},{l:"Seguir igual",d:"Confiás en que van a dejar de entrar."}]};return}
   var ae=0;c.forEach(function(p){ae+=p.en});ae/=c.length;
-  if(ae<55&&M.i<M.n-1&&!M.used["tired"+half]){M.used["tired"+half]=1;M.dec={k:"tired",t:"Tu equipo está cansado",x:"El quinteto en cancha está al "+Math.round(ae)+"% de energía.",o:[{l:"Tiempo muerto",d:M.tos>0?"Recuperan energía ya.":"No te quedan tiempos muertos.",dis:M.tos<=0},{l:"Bajar el ritmo",d:"Estrategia Equilibrado: se cansan menos."},{l:"Seguir igual",d:"Aguantan como están."}]};return}
+  if(ae<55&&M.i<M.n-1&&!M.used["tired"+half]){M.used["tired"+half]=1;M.dec={k:"tired",t:"Tu equipo está cansado",x:"El quinteto en cancha está al "+Math.round(ae)+"% de energía.",o:[{l:"Tiempo muerto",d:M.tos>0?"Recuperan energía ya.":"No te quedan tiempos muertos.",dis:M.tos<=0},{l:"Bajar el ritmo",d:"Ataque Equilibrado y defensa Individual: se cansan menos."},{l:"Seguir igual",d:"Aguantan como están."}]};return}
   if(M.i<M.n/2){var ft=c.filter(function(p){return p.pf>=FMAX()-2&&p.pf<FMAX()-1&&!M.used["f"+p.name]})[0];
     if(ft&&bench().some(function(x){return !x.out})){M.used["f"+ft.name]=1;M.dec={k:"foul",p:ft.name,f:ft.pf,t:sn(ft.name)+" está cargado de faltas",x:"Ya tiene "+ft.pf+" faltas y falta mucho para el entretiempo.",o:[{l:"Sentarlo hasta el entretiempo",d:"Lo cuidás para el segundo tiempo."},{l:"Que siga jugando",d:"Corrés el riesgo de que se cargue más."}]};return}}
   if(M.i<M.n-1&&!M.used["hot"+half]){var hm=c.filter(function(p){return pir(p)>=(half===1?11:16)&&p.name!==M.focus&&p.en>=60}).sort(function(a,b){return pir(b)-pir(a)})[0];
@@ -2792,7 +2792,7 @@ function decide(i){
     else M.event=sn(D.p)+" sigue en cancha con "+D.f+" faltas.";
   }else if(D.k==="run"){
     if(i===0){timeout(true);M.event="Tiempo muerto para cortar la racha del rival."}
-    else if(i===1){M.mod.oo=4;M.mod.t3=0.12;M.event="Tu equipo pasa a defender en zona."}
+    else if(i===1){M.dstr="zon";M.mod.oo=2;M.event="Tu equipo pasa a defender en Zona 2-3."}
     else if(i===2){M.mod.o=3;M.event="Arengaste al equipo: salen con todo."}
     else M.event="Seguís con el mismo plan.";
   }else if(D.k==="star"){
@@ -2804,11 +2804,11 @@ function decide(i){
     else if(i===1){M.opp.mk=D.q;M.dbl=true;M.event="Doble marca sobre "+sn(D.q)+"."}
     else M.event="No cambiás la defensa.";
   }else if(D.k==="t3"){
-    if(i===0){M.strat="def";M.mod.t3=-0.1;M.event="Salen a cerrar el perímetro: estrategia Defensa."}
+    if(i===0){M.dstr="swi";M.mod.t3=-0.1;M.event="Salen a cerrar el perímetro: cambian en todos los bloqueos."}
     else M.event="Seguís con el mismo plan.";
   }else if(D.k==="tired"){
     if(i===0){timeout(true);M.event="Tiempo muerto para que el equipo recupere aire."}
-    else if(i===1){M.strat="bal";M.event="Bajan el ritmo: estrategia Equilibrado."}
+    else if(i===1){M.strat="bal";if(M.dstr==="prs")M.dstr="man";M.event="Bajan el ritmo: ataque Equilibrado."}
     else M.event="Seguís con el mismo ritmo.";
   }else if(D.k==="hot"){
     if(i===0){M.focus=D.p;M.event="La pelota pasa por "+sn(D.p)+"."}
@@ -3413,7 +3413,7 @@ function showSave(msg){
   PRECODE="";if(navigator.share&&S&&S.my){packState().then(function(c){PRECODE=c})}
 }
 /* El iPhone solo abre Compartir si se llama apenas se toca el botón: el código se arma antes, al abrir la pantalla */
-var PRECODE="",GAMEVER="34";
+var PRECODE="",GAMEVER="35";
 function shareCode(){
   if(!PRECODE){exportCode();return}
   navigator.share({title:"Partida Basket Manager",text:PRECODE}).then(function(){toast("Código enviado ✓")},function(e){if(!e||e.name!=="AbortError")exportCode()});
@@ -3719,9 +3719,9 @@ function rotPlan(L,busyC,busyB,max,res){
 /* ---------- v32: el asistente sin bajar la pantalla ---------- */
 function quickHTML(){
   var pre=M.i===0&&!M.cur,txt="",btn="",go='<button class="ghost" style="font-weight:800" onclick="liveGo()">'+(pre?"▶ Empezar":"▶ Seguir")+'</button>';
-  if(pre){var R=preRec();txt=M.preOk?"✓ Consejos aplicados.":"Estrategia <b>"+strWord(R.st)+"</b>, que <b>"+sn(R.by.name)+"</b> marque a <b>"+sn(R.mk.name)+"</b> y la pelota para <b>"+sn(R.bo.name)+"</b>.";if(!M.preOk)btn='<button class="primary" onclick="applyPre()">✓ Aplicar</button>'}
+  if(pre){var R=preRec();txt=M.preOk?"✓ Consejos aplicados.":"Atacar con <b>"+strWord(R.st)+"</b>, defender <b>"+dWord(R.df)+"</b>, que <b>"+sn(R.by.name)+"</b> marque a <b>"+sn(R.mk.name)+"</b> y la pelota para <b>"+sn(R.bo.name)+"</b>.";if(!M.preOk)btn='<button class="primary" onclick="applyPre()">✓ Aplicar</button>'}
   else if(!M.cur&&M.i>0&&M.i<M.n&&!(M.i%(M.n/4))){qtrHTML();var r=M.qrec&&M.qrec.r;txt=M.qok===M.i?"✓ Hecho.":r?r.t:"El plan está funcionando. Seguí así.";if(r&&M.qok!==M.i)btn='<button class="primary" onclick="applyQtr()">✓ Hacerlo</button>'}
-  else if(M.i>=M.n&&!M.cur)txt="¡Prórroga! Empate "+M.me+"-"+M.op+". 5 minutos más: elegí la estrategia y tocá Seguir.";
+  else if(M.i>=M.n&&!M.cur)txt="¡Prórroga! Empate "+M.me+"-"+M.op+". 5 minutos más: elegí la táctica y tocá Seguir.";
   else txt="Partido en pausa.";
   if(!btn)go=go.replace('class="ghost"','class="primary"');
   return '<div class="quick"><p>🗣️ '+txt+'</p><div class="qb'+(btn?'':' one')+'">'+btn+go+'</div></div>';
@@ -3795,6 +3795,379 @@ function stopRisk(){
 .mko{font-weight:500;color:var(--muted);font-size:11.5px}
 .mko.bad{color:var(--bad);font-weight:700}
 .mke{font-size:11px}
+</style>
+<script>
+/* ---------- v35: tácticas de ataque y defensa ---------- */
+var TACO={bal:{n:"Equilibrado",c:"Equilibrado",s:"Un poco de todo, sin riesgos.",t3:0.30},
+  atk:{n:"Contraataque",c:"Contraataque",s:"Correr y tiros fáciles: más posesiones, pero cansa y se pierden más pelotas.",t3:0.30,p:0.01,to:0.02,pace:1.07,cost:2},
+  int:{n:"Juego interior",c:"Interior",s:"La pelota a los grandes: más dobles y faltas a favor. Mejor con dos grandes en cancha.",t3:0.15,fd:0.05,pace:0.98,cost:0.5},
+  tri:{n:"Triples",c:"Triples",s:"Mucho tiro de afuera: más riesgo, más premio. Depende del tiro.",t3:0.50,cost:0.5},
+  pnr:{n:"Pick and roll",c:"Pick & roll",s:"Base y pivote juegan juntos: depende del pase.",t3:0.28,cost:0.5},
+  iso:{n:"Aislar a la figura",c:"Aislar",s:"Tu mejor atacante juega uno contra uno.",t3:0.26,pace:0.97}};
+var TACD={man:{n:"Individual",c:"Individual",s:"Cada uno con su marca: rinde la defensa individual."},
+  zon:{n:"Zona 2-3",c:"Zona",s:"Cierra la pintura, pero regala triples y rebotes. Las marcas individuales pesan menos.",t3:0.08,orb:0.06,mm:0.4},
+  prs:{n:"Presión",c:"Presión",s:"Encima en toda la cancha: roba pelotas y sube el ritmo, pero cansa y hace faltas.",to:0.045,p:0.015,pace:1.04,cost:2.5,pf:0.05},
+  swi:{n:"Cambiar en bloqueos",c:"Cambios",s:"Frena el pick and roll y a los tiradores, pero deja desajustes de tamaño.",t3:-0.04,mm:1.6,cost:0.5},
+  len:{n:"Replegada",c:"Replegada",s:"Todos atrás y ritmo lento: menos posesiones. Sirve para frenar al favorito o cuidar una ventaja.",t3:0.03,pace:0.91}};
+/* ventaja del ataque contra cada defensa (puntos de porcentaje de acierto) */
+var TMX={"bal":{"man":0,"zon":-1.8,"prs":0.7,"swi":0.2,"len":-0.2},"atk":{"man":0.4,"zon":-1.4,"prs":2.8,"swi":0.7,"len":-3.1},"int":{"man":-0.5,"zon":-5.8,"prs":-0.6,"swi":1.8,"len":-1.1},"tri":{"man":-2.3,"zon":-0.2,"prs":-1,"swi":-2.6,"len":0.5},"pnr":{"man":1.5,"zon":-1.7,"prs":1.3,"swi":-2.5,"len":0.4},"iso":{"man":-0.7,"zon":-3,"prs":1,"swi":1.9,"len":-0.4}};
+var TSIM=0.5,TMXK=0.7;
+function tacPlan(){if(!S.tac)S.tac={o:"bal",d:"man",auto:1};return S.tac}
+/* perfil de un quinteto */
+function tacCtx(L,enf){
+  var X={off:0,tir:0,int:0,pas:0,reb:0,dfn:0,star:0,bigs:0,en:0},n=Math.max(1,L.length);
+  L.forEach(function(p){var a=p.a||attrs(p);X.off+=p.off;X.tir+=a.tir;X.int+=a.int;X.pas+=a.pas;X.reb+=a.reb;X.dfn+=a.dfn;X.star=Math.max(X.star,p.off);if(p.pos==="C"||p.pos==="PF")X.bigs++;X.en+=enf?enf(p):(p.en!=null?p.en:100)});
+  ["off","tir","int","pas","reb","dfn","en"].forEach(function(k){X[k]/=n});
+  if(!L.length){X.off=X.tir=X.int=X.pas=X.reb=X.dfn=X.star=60;X.en=100}
+  return X;
+}
+function teamCtx(id){return tacCtx(healthy(id).slice(0,5),function(p){return enOf(p.name)})}
+/* efectos de un ataque o contra una defensa d, con el quinteto X atacando y el Y defendiendo */
+function tacFx(o,d,X,Y){
+  var A=TACO[o]||TACO.bal,B=TACD[d]||TACD.man;
+  var fit=o==="pnr"?(X.pas-X.off)/200:o==="iso"?(X.star-X.off)/300-0.015:o==="int"?(X.bigs>=2?0.005:-0.02):o==="atk"?(X.en-95)/800:0;
+  return {t3:clamp(A.t3+(B.t3||0),0.08,0.65),bon:TMX[o][d]*TMXK/100+(A.p||0)+(B.p||0)+fit,
+    to:Math.max(0,(A.to||0)+(B.to||0)*clamp(1+(Y.dfn-X.off)/30,0.5,1.5)-(X.pas-X.off)/400),
+    fd:A.fd||0,orb:B.orb?clamp(B.orb+(X.reb-Y.reb)/200,0.02,0.12):0,mm:B.mm||1,pf:B.pf||0};
+}
+/* puntos esperados por posesión (para el asistente, el rival y los partidos simulados) */
+function tacPPP(o,d,X,Y){
+  var E=tacFx(o,d,X,Y),t3=E.t3,p2=clamp(0.52+(X.int-X.off)/120+E.bon,0.2,0.75),p3=clamp(0.39+(X.tir-X.off)/120+E.bon,0.15,0.62);
+  var ms=t3*(1-p3)+(1-t3)*(1-p2);
+  return (1-E.to)*(t3*3*p3+(1-t3)*(2*p2+(1-p2)*E.fd*1.48)+ms*E.orb*p2*2);
+}
+function tacPace(mo,md,oo,od){return clamp((TACO[mo].pace||1)*(TACD[md].pace||1)*(TACO[oo].pace||1)*(TACD[od].pace||1),0.75,1.3)}
+function tacCost(o,d){return (TACO[o]&&TACO[o].cost||0)+(TACD[d]&&TACD[d].cost||0)}
+/* mejor ataque contra la defensa d; mejor defensa contra el ataque o (en=energía del que elige) */
+function bestO(d,X,Y,en,ex){
+  var b=null,bv=-9;Object.keys(TACO).forEach(function(o){if(ex&&o===ex)return;var v=tacPPP(o,d,X,Y)-(en<65?(TACO[o].cost||0)*0.006:0);if(v>bv){bv=v;b=o}});return b;
+}
+function bestD(o,X,Y,en,ex){
+  var b=null,bv=9;Object.keys(TACD).forEach(function(d){if(ex&&d===ex)return;var v=(o?tacPPP(o,d,X,Y):avgO(d,X,Y))+(en<65?(TACD[d].cost||0)*0.006:0);if(v<bv){bv=v;b=d}});return b;
+}
+function avgD(o,X,Y){var s=0,k=Object.keys(TACD);k.forEach(function(d){s+=tacPPP(o,d,X,Y)});return s/k.length}
+function avgO(d,X,Y){var s=0,k=Object.keys(TACO);k.forEach(function(o){s+=tacPPP(o,d,X,Y)});return s/k.length}
+/* el plan "natural" de un equipo según su plantel */
+function natO(X,Y){var b="bal",bv=-9;Object.keys(TACO).forEach(function(o){var v=avgD(o,X,Y)-(TACO[o].cost||0)*0.006+(Math.random()-0.5)*0.03;if(v>bv){bv=v;b=o}});return b}
+function natD(Xo,Y){var b="man",bv=9;Object.keys(TACD).forEach(function(d){var v=avgO(d,Xo,Y)+(TACD[d].cost||0)*0.006+(Math.random()-0.5)*0.03;if(v<bv){bv=v;b=d}});return b}
+function smartP(){return 0.4+0.06*stLvl("tac")}
+/* ---- partidos simulados ---- */
+function simTac(id,opp,X,Y){
+  if(S&&id===S.my){var P=tacPlan();if(!P.auto)return {o:P.o,d:P.d};
+    if(Math.random()<smartP()){var Po={o:natO(Y,X)};return {o:bestO(natD(X,Y),X,Y,100),d:bestD(Po.o,Y,X,100)}}
+    return {o:natO(X,Y),d:natD(Y,X)}}
+  var o=natO(X,Y),d=natD(Y,X);
+  if(Math.random()<0.45){
+    var mo=S&&opp===S.my&&!tacPlan().auto?tacPlan().o:natO(Y,X),md=S&&opp===S.my&&!tacPlan().auto?tacPlan().d:natD(X,Y);
+    o=bestO(md,X,Y,100);d=bestD(mo,Y,X,100);
+  }
+  return {o:o,d:d};
+}
+var simGame0=simGame;
+simGame=function(a,b,cx){
+  var r=simGame0(a,b,cx);
+  try{
+    var Xa=teamCtx(a),Xb=teamCtx(b),ta=simTac(a,b,Xa,Xb),tb=simTac(b,a,Xb,Xa);
+    var base=tacPPP("bal","man",Xa,Xb),e=(tacPPP(ta.o,tb.d,Xa,Xb)-tacPPP(tb.o,ta.d,Xb,Xa))/Math.max(0.5,base);
+    var P=cx?cx.P:LC().pts,sh=P*e*TSIM/2,w=r[0]>r[1];
+    var pa=Math.round(r[0]+sh),pb=Math.round(r[1]-sh);
+    if(pa===pb){if(w)pa++;else pb++}
+    return [pa,pb];
+  }catch(err){return r}
+};
+/* ---- partido en vivo ---- */
+var playGame0=playGame;
+playGame=function(opp){
+  playGame0(opp);
+  var P=tacPlan();M.strat=P.o;M.dstr=P.d;
+  var X=tacCtx(oppCourt()),Y=tacCtx(court());
+  M.otac={o:natO(X,Y),d:natD(Y,X)};
+  if(Math.random()<smartP()-0.1)M.otac.d=bestD(P.o,Y,X,100);
+  M.otac0={o:M.otac.o,d:M.otac.d};
+  showMoment();
+};
+function oppTacAdapt(why){
+  if(!M.otac)return;
+  var X=tacCtx(oppCourt()),Y=tacCtx(court()),old={o:M.otac.o,d:M.otac.d},diff=M.op-M.me,late=M.i>=M.n*3/4;
+  var en=M.oppEn;
+  if(late&&diff>=7){M.otac.d=en>=60?"len":"man";M.otac.o=X.star-X.off>=6?"iso":"bal"}
+  else if(late&&diff<=-7){M.otac.o=en>=55?"atk":bestO(M.dstr,X,Y,en);M.otac.d=en>=55?"prs":bestD(M.strat,Y,X,en)}
+  else if(Math.random()<(why==="run"?0.6:smartP())){M.otac.o=bestO(M.dstr,X,Y,en);M.otac.d=bestD(M.strat,Y,X,en)}
+  if(M.otac.d==="prs"&&en<55)M.otac.d="man";
+  var t=[];
+  if(old.o!==M.otac.o)t.push("ahora ataca con "+TACO[M.otac.o].n);
+  if(old.d!==M.otac.d)t.push("ahora defiende "+dWord(M.otac.d));
+  if(t.length){M.otacMsg=M.opp.name+" cambia: "+t.join(" y ")+".";if(M.run||M.cur)showLine({t:"Cambio táctico de "+M.opp.name+": "+t.join(" y ")+".",m:false,me:M.dMe,op:M.dOp})}
+  return t.length>0;
+}
+function dWord(d){return d==="zon"?"en Zona 2-3":d==="prs"?"con Presión":d==="swi"?"cambiando en los bloqueos":d==="len"?"replegado":"individual"}
+function myShooter(three){
+  var st=M.strat==="iso"?bestOff():null;
+  return wpick(court(),function(p){var b=three?p.a.tir:p.a.int,w=Math.max(1,(eff(p,"off")+b)/2-40)*(M.focus===p.name?2.5:1);
+    if(st===p)w*=2.5;if(!three&&M.strat==="int"&&(p.pos==="C"||p.pos==="PF"))w*=1.6;if(M.strat==="pnr"&&(p.pos==="PG"||p.pos==="C"))w*=1.4;return w});
+}
+function oppShooter(three){
+  var oo=M.otac?M.otac.o:"bal",c=oppCourt(),st=oo==="iso"?c.reduce(function(b,p){return p.off>b.off?p:b},c[0]):null;
+  return wpick(c,function(p){var b=three?p.a.tir:p.a.int,w=Math.max(1,(p.off+b)/2-40)*(1+0.25*mmEdge(p,defOf(p,true),three));
+    if(p.name===M.opp.mk){if(M.dbl)w*=0.4;else if(onCourt(M.stop))w*=0.6}
+    if(st===p)w*=2.5;if(!three&&oo==="int"&&(p.pos==="C"||p.pos==="PF"))w*=1.6;if(oo==="pnr"&&(p.pos==="PG"||p.pos==="C"))w*=1.4;return w});
+}
+function ftPct(p){return clamp(0.66+((p.a?p.a.tir:60)-60)/220,0.5,0.92)}
+function possMine(off,def,strat){
+  var E=M.tE||tacFx("bal","man",tacCtx(court()),tacCtx(oppCourt()));
+  if(Math.random()<0.13+E.pf&&M.opp.pl[0].en!=null)oppFoul();
+  var c=court();
+  if(Math.random()<E.to){var bh=wpick(c,function(x){return Math.max(2,eff(x,"off")-40)*(x.pos==="PG"?1.5:1)}),ts0=wpick(oppCourt(),function(x){return Math.max(2,x.a.dfn-40)});ad(bh,"tov");ad(ts0,"stl");if(Math.random()<0.5)lg((M.otac&&M.otac.d==="prs"?"La presión rival funciona: ":"")+"pérdida de "+sn(bh.name)+", roba "+sn(ts0.name)+" (rival).",true);return 0}
+  var three=Math.random()<E.t3,o=0;
+  c.forEach(function(p){o+=p.off});o/=c.length;
+  var adj=((three?cAvg("tir"):cAvg("int"))-o)/120;
+  var p=clamp(0.52+(off-def-(M.cx?M.cx.lg:LG))/200-(three?0.13:0)+adj+E.bon,0.2,0.75);
+  var sh=myShooter(three);
+  p=clamp(p+mmAdj(sh,defOf(sh,false),three)*E.mm,0.2,0.75);
+  var apr=M.strat==="pnr"?0.68:M.strat==="iso"?0.4:0.58;
+  if(Math.random()<p){
+    var pts=three?3:2;ad(sh,"pts",pts);
+    var as=null;
+    if(Math.random()<apr){var oth=c.filter(function(x){return x!==sh});as=wpick(oth,function(x){return Math.max(2,x.a.pas-35)*(M.strat==="pnr"&&x.pos==="PG"?2:1)});ad(as,"ast")}
+    if(three){ad(sh,"fga");ad(sh,"fgm");ad(sh,"t3a");ad(sh,"t3m");lg(as?sn(as.name)+" asiste y ¡triple de "+sn(sh.name)+"!":"¡Triple de "+sn(sh.name)+"!",true)}
+    else if(!as&&Math.random()<0.2){ad(sh,"fta",2);ad(sh,"ftm",2);ad(sh,"fd");var of=M.opp.pl[0].en!=null?oppFoul(true):null;lg(sn(sh.name)+" recibe falta"+(of?" de "+sn(of.name):"")+" y mete los dos libres.",true)}
+    else{ad(sh,"fga");ad(sh,"fgm");lg(as?(M.strat==="pnr"&&as.pos==="PG"&&(sh.pos==="C"||sh.pos==="PF")?"Pick and roll: "+sn(as.name)+" se la da a "+sn(sh.name)+", que anota.":sn(as.name)+" asiste a "+sn(sh.name)+", que anota."):M.strat==="atk"&&Math.random()<0.4?sn(sh.name)+" anota en contraataque.":sn(sh.name)+" encara y anota.",true)}
+    return pts;
+  }
+  if(!three&&E.fd&&Math.random()<E.fd){var fp=ftPct(sh),m=(Math.random()<fp?1:0)+(Math.random()<fp?1:0);ad(sh,"fta",2);ad(sh,"ftm",m);ad(sh,"pts",m);ad(sh,"fd");var of2=M.opp.pl[0].en!=null?oppFoul(true):null;lg(sn(sh.name)+" recibe falta"+(of2?" de "+sn(of2.name):"")+" abajo y mete "+m+" de 2 libres.",true);return m}
+  if(Math.random()<0.22){var ts=wpick(oppCourt(),function(x){return Math.max(2,x.a.dfn-40)});ad(sh,"tov");ad(ts,"stl");if(Math.random()<0.45)lg("Pérdida de "+sn(sh.name)+": roba "+sn(ts.name)+" (rival).",true);return 0}
+  ad(sh,"fga");if(three)ad(sh,"t3a");
+  if(!three&&Math.random()<0.12){var bk=wpick(oppCourt(),function(x){return Math.max(2,x.a.dfn-40)*(x.pos==="C"||x.pos==="PF"?1.6:1)});ad(bk,"blk");if(Math.random()<0.4)lg("Tapón de "+sn(bk.name)+" (rival) a "+sn(sh.name)+".",true)}
+  if(E.orb&&Math.random()<E.orb){var pr=wpick(c,function(x){return Math.max(2,x.a.reb-35)});ad(pr,"reb");ad(pr,"fga");if(Math.random()<clamp(0.52+E.bon,0.3,0.7)){ad(pr,"fgm");ad(pr,"pts",2);lg("Rebote ofensivo de "+sn(pr.name)+" contra la zona y segunda oportunidad: ¡dos puntos!",true);return 2}return 0}
+  if(Math.random()<0.27){var rb=wpick(c,function(x){return Math.max(2,x.a.reb-35)});ad(rb,"reb");if(Math.random()<0.4)lg(sn(sh.name)+" falla y "+sn(rb.name)+" toma el rebote ofensivo.",true)}
+  else{var orb=wpick(oppCourt(),function(x){return Math.max(2,x.a.reb-35)});ad(orb,"reb");if(three&&Math.random()<0.35)lg(sn(sh.name)+" falla el triple.",true)}
+  return 0;
+}
+function possOpp(off,def,os){
+  var E=M.tO||tacFx("bal","man",tacCtx(oppCourt()),tacCtx(court())),A=M.opp.A,oc=oppCourt();
+  if(Math.random()<E.to){var bh=wpick(oc,function(x){return Math.max(2,x.off-40)*(x.pos==="PG"?1.5:1)}),ts0=wpick(court(),function(x){return Math.max(2,x.a.dfn-40)});ad(bh,"tov");ad(ts0,"stl");if(Math.random()<0.5)lg((M.dstr==="prs"?"¡La presión da resultado! ":"¡")+"Robo de "+sn(ts0.name)+"!",true);return 0}
+  var three=Math.random()<clamp(E.t3+M.mod.t3+(M.dbl?0.08:0),0.05,0.72);
+  var adj=A?((three?A.tir:A.int)-A.off)/120:0;
+  var sh=oppShooter(three);
+  var dm=defOf(sh,true);adj+=mmAdj(sh,dm,three)*E.mm;
+  if(sh.name===M.opp.mk&&dm&&dm.name===M.stop)adj-=0.02;
+  var p=clamp(0.52+(off-def-(M.cx?M.cx.lg:LG))/200-(three?0.13:0)+adj+E.bon,0.2,0.75);
+  if(Math.random()<0.15+E.pf){myFoul();ad(sh,"fd")}
+  if(Math.random()<p){
+    var pts=three?3:2;ad(sh,"pts",pts);ad(sh,"fga");ad(sh,"fgm");if(three){ad(sh,"t3a");ad(sh,"t3m")}
+    var oo=M.otac?M.otac.o:"bal";
+    if(Math.random()<(oo==="pnr"?0.68:oo==="iso"?0.4:0.58)){var oth=oc.filter(function(x){return x!==sh});ad(wpick(oth,function(x){return Math.max(2,x.a.pas-35)}),"ast")}
+    if(!three&&Math.random()<0.15){var f=myFoul();ad(sh,"fd");lg(sn(sh.name)+" (rival) anota tras falta de "+sn(f.name)+".",false)}
+    else lg((three?"Triple de ":"Dos puntos de ")+sn(sh.name)+" (rival).",false);
+    return pts;
+  }
+  if(!three&&E.fd&&Math.random()<E.fd){var fp=ftPct(sh),m=(Math.random()<fp?1:0)+(Math.random()<fp?1:0),f2=myFoul();ad(sh,"fta",2);ad(sh,"ftm",m);ad(sh,"fd");ad(sh,"pts",m);lg(sn(sh.name)+" (rival) recibe falta de "+sn(f2.name)+" y mete "+m+" de 2 libres.",false);return m}
+  if(Math.random()<0.22){var ts=wpick(court(),function(x){return Math.max(2,x.a.dfn-40)});ad(sh,"tov");ad(ts,"stl");if(Math.random()<0.45)lg("¡Robo de "+sn(ts.name)+"!",true);return 0}
+  ad(sh,"fga");if(three)ad(sh,"t3a");
+  if(!three&&Math.random()<0.12){var bk=wpick(court(),function(x){return Math.max(2,x.a.dfn-40)*(x.pos==="C"||x.pos==="PF"?1.6:1)});ad(bk,"blk");if(Math.random()<0.4)lg("¡Tapón de "+sn(bk.name)+" a "+sn(sh.name)+"!",true)}
+  if(E.orb&&Math.random()<E.orb){var pr=wpick(oc,function(x){return Math.max(2,x.a.reb-35)});ad(pr,"reb");ad(pr,"fga");if(Math.random()<clamp(0.52+E.bon,0.3,0.7)){ad(pr,"fgm");ad(pr,"pts",2);lg("Rebote ofensivo de "+sn(pr.name)+" (rival) contra tu zona: segunda oportunidad y dos puntos.",false);return 2}return 0}
+  if(Math.random()<0.27)ad(wpick(oc,function(x){return Math.max(2,x.a.reb-35)}),"reb");
+  else ad(wpick(court(),function(x){return Math.max(2,x.a.reb-35)}),"reb");
+  return 0;
+}
+function segment(strat,N){
+  if(!M.otac)M.otac={o:"bal",d:"man"};
+  if(!M.dstr)M.dstr="man";if(!TACO[strat])strat="bal";
+  var ma=M.cx&&M.cx.adj?(M.cx.adj[S.my]||0):0,myO=teamVal("off")+ma+M.mod.o,myD=teamVal("def")+ma+M.mod.d;
+  if(onCourt(M.focus)){var f=court().filter(function(x){return x.name===M.focus})[0];myO+=(eff(f,"off")-teamVal("off"))*0.15}
+  var of=EFF_A+(1-EFF_A)*M.oppEn/100;
+  var opO=M.opp.o*of-M.mod.oo-(M.dbl?1.5:0),opD=M.opp.d*of;
+  if(M.tm){opO-=6;M.tm=false}
+  var Xm=tacCtx(court()),Xo=tacCtx(oppCourt());
+  M.tE=tacFx(strat,M.otac.d,Xm,Xo);M.tO=tacFx(M.otac.o,M.dstr,Xo,Xm);
+  M.segT={mo:strat,md:M.dstr,oo:M.otac.o,od:M.otac.d};
+  var n=Math.max(3,Math.round(N*tacPace(strat,M.dstr,M.otac.o,M.otac.d)));
+  var my=0,op=0,i;M.log=[];
+  var p0=M.opp.pl.map(function(p){return p.pts}),me0=M.me,op0=M.op,k;
+  M.sev=[];var s;
+  var tag=function(k,s,f){for(;k<M.log.length;k++){M.log[k].me=me0+my;M.log[k].op=op0+op;M.log[k].f=f}for(;s<M.sev.length;s++)M.sev[s].f=f};
+  for(i=0;i<n;i++){k=M.log.length;s=M.sev.length;my+=possMine(myO,opD,strat);tag(k,s,(i+0.35)/n);k=M.log.length;s=M.sev.length;op+=possOpp(opO,myD,M.otac.o);tag(k,s,(i+0.85)/n)}
+  M.opp.pl.forEach(function(p,j){(p.h=p.h||[]).push(p.pts-p0[j])});
+  M.me+=my;M.op+=op;M.mod={o:0,d:0,oo:0,t3:0};M.oso=M.otac.o;
+  return {my:my,op:op,os:M.otac.o};
+}
+function fatigue(strat){
+  var T=M.segT||{mo:"bal",md:"man",oo:"bal",od:"man"};
+  var sc=12/M.n*(M.i>=M.n?5/6:1);
+  var cost=(COST+tacCost(T.mo,T.md))*sc;
+  court().forEach(function(p){p.en=Math.max(5,p.en-cost-rnd(-1,2)-(p.name===M.focus?1.5*sc:0));p.mn=(p.mn||0)+sc});
+  if(M.opp.pl[0].en!=null){var oc=(COST+tacCost(T.oo,T.od))*sc;
+    M.opp.pl.forEach(function(p,j){if(j<5){p.en=Math.max(5,p.en-oc-rnd(-1,2));p.mn=(p.mn||0)+sc}else p.en=Math.min(100,p.en+REC*sc)});
+    rotCount(M.opp.pl);oppEnSet()}
+  else M.oppEn=Math.max(30,M.oppEn-cost*OPP_TIRE);
+  rotCount(M.roster);
+  bench().forEach(function(p){p.en=Math.min(100,p.en+REC*sc)});
+}
+/* el rival se adapta: en cada cuarto, tras un parcial en contra y en el final */
+var endTramo0=endTramo;
+endTramo=function(){
+  var c=M.cur,qn=M.n/4;
+  M.otacMsg=null;
+  if(c&&M.i+1<mEnd()){
+    var ni=M.i+1;
+    if(ni%qn===0||ni>=M.n)oppTacAdapt();
+    else if(c.r&&c.r.my-c.r.op>=8)oppTacAdapt("run");
+    else if(ni>=M.n*3/4&&Math.abs(M.op-M.me)>=7)oppTacAdapt();
+  }
+  endTramo0();
+  var el=document.getElementById("lvst");if(el&&M&&M.run)el.innerHTML=stratBtns();
+};
+function describe(r){
+  var d=r.my-r.op,t="";
+  if(d>=9)t="¡Parcial de "+r.my+"-"+r.op+" a tu favor! Estás imparable.";
+  else if(d<=-9)t="Racha del rival: "+r.op+"-"+r.my+". Pensá en pedir tiempo muerto.";
+  else if(d>0)t="Tramo ganado "+r.my+"-"+r.op+".";
+  else if(d<0)t="Tramo perdido "+r.my+"-"+r.op+".";
+  else t="Tramo empatado "+r.my+"-"+r.op+".";
+  if(M.otacMsg)t+=" "+M.otacMsg;
+  var avg=0;court().forEach(function(p){avg+=p.en});avg/=5;
+  if(avg<50)t+=" Tu quinteto está muy cansado.";
+  return t;
+}
+/* ---- botones de táctica ---- */
+var STRATN={};Object.keys(TACO).forEach(function(k){STRATN[k]=TACO[k].n});
+var STRATS={};Object.keys(TACO).forEach(function(k){STRATS[k]={o:0,d:0}});
+function strWord(k){return (TACO[k]||TACO.bal).n}
+function setStrat(k){if(!M||!TACO[k])return;M.strat=k;tacRefresh("Ataque: "+TACO[k].n)}
+function setDef(k){if(!M||!TACD[k])return;M.dstr=k;tacRefresh("Defensa: "+TACD[k].n)}
+function tacRefresh(msg){if(M.run){var el=document.getElementById("lvst");if(el)el.innerHTML=stratBtns();toast(msg)}else showMoment()}
+function tacRec(){
+  var Xm=tacCtx(court()),Xo=tacCtx(oppCourt()),ae=courtEn();
+  return {o:bestO(M.otac.d,Xm,Xo,ae),d:bestD(M.otac.o,Xo,Xm,ae)};
+}
+function tBtn(on,click,lbl,rec){return '<button class="ghost'+(on?' on':'')+'" style="padding:6px 2px;font-size:12.5px;min-height:38px;line-height:1.1;'+(on?'background:var(--wood);color:var(--wood-ink);border-color:var(--wood);font-weight:800':'')+'" onclick="'+click+'" aria-pressed="'+on+'">'+lbl+(rec&&!on?' ★':'')+'</button>'}
+function stratBtns(){
+  var R=tacRec();
+  return '<p class="muted" style="margin:0 0 4px;font-size:12px;font-weight:700">ATAQUE</p><div class="tg">'+Object.keys(TACO).map(function(k){return tBtn(M.strat===k,"setStrat('"+k+"')",TACO[k].c,R.o===k)}).join("")+'</div>'+
+    '<p class="muted" style="margin:8px 0 4px;font-size:12px;font-weight:700">DEFENSA</p><div class="tg">'+Object.keys(TACD).map(function(k){return tBtn(M.dstr===k,"setDef('"+k+"')",TACD[k].c,R.d===k)}).join("")+'</div>'+
+    '<p class="muted" style="margin:6px 0 0;font-size:12.5px">'+oppTacLine()+' ★ = lo que conviene ahora.</p>';
+}
+function oppTacLine(){return M.otac?M.opp.name+' ataca con <b>'+TACO[M.otac.o].n+'</b> y defiende <b>'+dWord(M.otac.d)+'</b>.':''}
+/* explicación de por qué conviene cada táctica */
+function whyO(o){
+  var d=M.otac.d,X=tacCtx(court()),v=TMX[o][d];
+  var r=v>=2?"funciona bien contra "+TACD[d].n:v<=-2?"le cuesta contra "+TACD[d].n:"";
+  if(o==="tri")r+=(r?" · ":"")+"tiro de tu quinteto "+Math.round(X.tir);
+  if(o==="int")r+=(r?" · ":"")+"juego interior "+Math.round(X.int)+(X.bigs<2?", pocos grandes en cancha":"");
+  if(o==="pnr")r+=(r?" · ":"")+"pase "+Math.round(X.pas);
+  if(o==="iso"){var b=bestOff();r+=(r?" · ":"")+"figura: "+sn(b.name)+" (ataque "+b.off+")"}
+  if(o==="atk")r+=(r?" · ":"")+"energía "+Math.round(courtEn())+"%";
+  return r;
+}
+function whyD(d){
+  var o=M.otac.o,v=TMX[o][d];
+  var r=v<=-2?"frena su "+TACO[o].n:v>=2?"sufre contra su "+TACO[o].n:"";
+  if(d==="prs")r+=(r?" · ":"")+"defensa de tu quinteto "+Math.round(cAvg("dfn"));
+  if(d==="zon")r+=(r?" · ":"")+"rebote "+Math.round(cAvg("reb"));
+  return r;
+}
+function tacOpts(){
+  var R=tacRec();
+  var oo=Object.keys(TACO).map(function(k){var w=whyO(k);return '<button class="opt'+(M.strat===k?' sel':'')+'" onclick="setStrat(\''+k+'\')"><b>'+TACO[k].n+(R.o===k?' <span class="pill" style="font-size:11px">★ conviene</span>':'')+'</b><span>'+TACO[k].s+(w?'<br><i>'+w+'</i>':'')+'</span></button>'}).join("");
+  var dd=Object.keys(TACD).map(function(k){var w=whyD(k);return '<button class="opt'+(M.dstr===k?' sel':'')+'" onclick="setDef(\''+k+'\')"><b>'+TACD[k].n+(R.d===k?' <span class="pill" style="font-size:11px">★ conviene</span>':'')+'</b><span>'+TACD[k].s+(w?'<br><i>'+w+'</i>':'')+'</span></button>'}).join("");
+  var scout=M.i===0&&!M.cur?'Según el informe, '+M.opp.name+' suele atacar con <b>'+TACO[M.otac.o].n+'</b> y defender <b>'+dWord(M.otac.d)+'</b>.':oppTacLine();
+  return '<h2 style="margin-top:14px">Táctica</h2><div class="card" style="padding:10px 12px"><p style="margin:0;font-size:14px">🔎 '+scout+'</p></div>'+
+    '<h2 style="margin-top:10px;font-size:16px">Ataque</h2>'+oo+'<h2 style="margin-top:10px;font-size:16px">Defensa</h2>'+dd;
+}
+var showMoment0=showMoment;
+showMoment=function(){
+  if(!M.otac)M.otac={o:"bal",d:"man"};if(!M.dstr)M.dstr="man";
+  showMoment0();
+  if(M.run)return;
+  var app=document.getElementById("app"),h2=app.querySelectorAll(".lvl h2"),st=null;
+  for(var i=0;i<h2.length;i++)if(h2[i].textContent==="Estrategia")st=h2[i];
+  if(!st)return;
+  var n=st.nextSibling,rm=[];
+  while(n&&n.classList&&n.classList.contains("opt")){rm.push(n);n=n.nextSibling}
+  rm.forEach(function(x){x.remove()});
+  var w=document.createElement("div");w.innerHTML=tacOpts();
+  st.replaceWith.apply(st,Array.prototype.slice.call(w.childNodes));
+};
+/* ---- asistente ---- */
+function preRec(){
+  var A=M.opp.A||{tir:60,int:60},oid=M.opp.id;
+  var diff=STR[oid]&&STR[S.my]?(STR[oid].ovr+adjOf(oid))-(STR[S.my].ovr+adjOf(S.my)):0;
+  var R=tacRec(),st=R.o,df=R.d,me=courtEn();
+  var why="Contra su "+TACD[M.otac.d].n+" lo que mejor te sirve es <b>"+TACO[st].n+"</b>"+(whyO(st)?" ("+whyO(st)+")":"")+".";
+  var whyd="Para frenar su "+TACO[M.otac.o].n+", defendé <b>"+dWord(df)+"</b>.";
+  if(diff>=6&&TMX[M.otac.o].len<=0){df="len";whyd="Son más fuertes: defensa <b>replegada</b> para jugar un partido de pocas posesiones."}
+  else if(M.oppEn<=80&&me>=85&&TMX.atk[M.otac.d]>=0){st="atk";why="El rival llega cansado ("+Math.round(M.oppEn)+"% de energía): <b>Contraataque</b> para hacerlos correr."}
+  var s=oppSugg(),bo=bestOff();
+  return {st:st,df:df,why:why,whyd:whyd,mk:s.p,by:s.d||bestDef(),bo:bo,diff:diff,A:A};
+}
+var preHTML0=preHTML;
+preHTML=function(){
+  var R=preRec(),h=preHTML0();
+  return h.replace(/<p style="font-size:14px;margin:0 0 5px">• Estrategia <b>[\s\S]*?<\/p>/,'<p style="font-size:14px;margin:0 0 5px">• Ataque: '+R.why+'</p><p style="font-size:14px;margin:0 0 5px">• Defensa: '+R.whyd+'</p>');
+};
+function applyPre(){var R=preRec();M.strat=R.st;M.dstr=R.df;M.opp.mk=R.mk.name;M.stop=R.by.name;M.dbl=false;M.focus=R.bo.name;M.preOk=1;M.event="Aplicaste los consejos del asistente.";showMoment()}
+function qtrRec(){
+  var me=M.roster,op=M.opp.pl,diff=M.me-M.op,q=M.i/(M.n/4),ae=courtEn();
+  var o3m=teamSum(op,"t3m"),o3a=teamSum(op,"t3a");
+  var sh=M.op?o3m*3/M.op:0,r=null,R=tacRec(),t=[];
+  if(ae<62&&M.tos>0){r={to:1,t:"Usá un <b>tiempo muerto</b> para que el quinteto recupere aire."};if(tacCost(M.strat,M.dstr)>=2){r.st="bal";if(M.dstr==="prs")r.df="man";r.t+=" Y bajá el ritmo: <b>Equilibrado</b>"+(M.dstr==="prs"?" e <b>Individual</b>":"")+"."}}
+  else{
+    if(diff>=12&&q>=3&&M.dstr!=="len"){r={df:"len",t:"Ganás por "+diff+": <b>defensa replegada</b> para cerrar el partido."}}
+    else if(diff<=-10&&q>=3&&ae>=60&&M.dstr!=="prs"){r={df:"prs",st:M.strat==="atk"?null:"atk",t:"Vas abajo por "+(-diff)+": <b>Presión</b> y <b>Contraataque</b> para buscar un parcial."}}
+    else{
+      if(R.o!==M.strat&&TMX[R.o][M.otac.d]-TMX[M.strat][M.otac.d]>=1.5)t.push({st:R.o,x:"Te defienden "+dWord(M.otac.d)+": pasá a <b>"+TACO[R.o].n+"</b>."});
+      if(R.d!==M.dstr&&TMX[M.otac.o][M.dstr]-TMX[M.otac.o][R.d]>=1.5)t.push({df:R.d,x:"Atacan con "+TACO[M.otac.o].n+": defendé <b>"+dWord(R.d)+"</b>."});
+      else if(sh>=0.4&&o3a>=6&&M.dstr==="zon")t.push({df:"man",x:"La zona les deja tirar: volvé a <b>Individual</b>."});
+      if(t.length){r={t:t.map(function(x){return x.x}).join(" ")};t.forEach(function(x){if(x.st)r.st=x.st;if(x.df)r.df=x.df})}
+    }
+  }
+  var c=court().filter(function(p){return p.en>=60}).sort(function(a,b){return pir(b)-pir(a)})[0];
+  if(c&&pir(c)>=8&&c.name!==M.focus&&M.strat!=="iso"){r=r||{t:""};r.fo=c.name;r.t+=(r.t?" ":"")+"Que la pelota pase por <b>"+sn(c.name)+"</b> (PIR "+pir(c)+")."}
+  return r;
+}
+function applyQtr(){var R=M.qrec&&M.qrec.r;if(!R||M.qok===M.i)return;if(R.to)timeout(true);if(R.st)M.strat=R.st;if(R.df)M.dstr=R.df;if(R.fo)M.focus=R.fo;M.qok=M.i;M.event="Hiciste lo que te sugirió el asistente.";showMoment()}
+var assistTip0=assistTip;
+assistTip=function(){
+  var t=assistTip0();
+  if(M.tipA&&(M.tipA.k==="def"||M.tipA.k==="atk")){
+    if(M.tipA.k==="def"){if(M.dstr!=="swi"&&M.dstr!=="man"){M.tipA={k:"dd",v:"man",l:"Individual"}}else if(M.dstr!=="swi")M.tipA={k:"dd",v:"swi",l:"Cambios"};else M.tipA=null}
+    else{M.tipA=M.strat==="atk"?null:{k:"oo",v:"atk",l:"Contraataque"}}
+    return t;
+  }
+  if(M.tipA||/faltas|energía|caliente/.test(t))return t;
+  if(M.otac){var R=tacRec();
+    if(R.o!==M.strat&&TMX[R.o][M.otac.d]-TMX[M.strat][M.otac.d]>=2){M.tipA={k:"oo",v:R.o,l:TACO[R.o].c};return "Nos defienden "+dWord(M.otac.d)+": "+TACO[R.o].n+" les hace daño."}
+    if(R.d!==M.dstr&&TMX[M.otac.o][M.dstr]-TMX[M.otac.o][R.d]>=2){M.tipA={k:"dd",v:R.d,l:TACD[R.d].c};return "Nos atacan con "+TACO[M.otac.o].n+": conviene defender "+dWord(R.d)+"."}
+  }
+  return t;
+};
+var tipDo0=tipDo;
+tipDo=function(){
+  var A=M.tipA;if(!A||!M)return;
+  if(A.k==="oo"||A.k==="dd"){M.tipA=null;if(A.k==="oo")M.strat=A.v;else M.dstr=A.v;var el=document.getElementById("lvst");if(el)el.innerHTML=stratBtns();M.tip="Hecho: "+(A.k==="oo"?"ataque "+TACO[A.v].n:"defensa "+TACD[A.v].n)+".";M.tipS=null;updLive();return}
+  tipDo0();
+};
+/* ---- plan de juego (partidos simulados y arranque en vivo) ---- */
+function showPlan(back){
+  var P=tacPlan(),bk=back==="h"?"showHub()":"showRoster()";
+  var X=teamCtx(S.my);
+  var h='<h1>Plan de juego</h1><p class="muted">Con este plan arranca tu equipo los partidos en vivo, y es el que se usa al simular. Cada táctica le gana a unas y pierde con otras, y rinde según tus jugadores.</p>'+
+    '<div class="card"><label class="row" style="gap:10px;cursor:pointer"><span><b>Que el asistente lo adapte a cada rival</b><br><span class="muted" style="font-size:13px">Al simular elige lo que mejor le sirve contra cada equipo. Acierta más con un mejor ayudante táctico (nivel '+stLvl("tac")+').</span></span><input type="checkbox" style="width:24px;height:24px;flex:none" '+(P.auto?'checked':'')+' onchange="S.tac.auto=this.checked?1:0;save();showPlan(\''+(back||'')+'\')"></label></div>'+
+    '<div class="card"><p style="margin:0;font-size:14px">Tu quinteto: tiro <b>'+Math.round(X.tir)+'</b> · interior <b>'+Math.round(X.int)+'</b> · pase <b>'+Math.round(X.pas)+'</b> · rebote <b>'+Math.round(X.reb)+'</b> · defensa <b>'+Math.round(X.dfn)+'</b>.</p></div>';
+  h+='<h2>Ataque'+(P.auto?' (cuando juegues en vivo)':'')+'</h2>'+Object.keys(TACO).map(function(k){return '<button class="opt'+(P.o===k?' sel':'')+'" onclick="S.tac.o=\''+k+'\';save();showPlan(\''+(back||'')+'\')"><b>'+TACO[k].n+'</b><span>'+TACO[k].s+'</span></button>'}).join("");
+  h+='<h2>Defensa'+(P.auto?' (cuando juegues en vivo)':'')+'</h2>'+Object.keys(TACD).map(function(k){return '<button class="opt'+(P.d===k?' sel':'')+'" onclick="S.tac.d=\''+k+'\';save();showPlan(\''+(back||'')+'\')"><b>'+TACD[k].n+'</b><span>'+TACD[k].s+'</span></button>'}).join("");
+  h+='<div class="card"><h2>Qué le gana a qué</h2><p style="font-size:14px;margin:0">• <b>Zona 2-3</b> frena el juego interior y el aislamiento, pero sufre con los triples.<br>• <b>Cambiar en bloqueos</b> frena el pick and roll y los triples, pero sufre con el juego interior y el aislamiento.<br>• <b>Presión</b> roba pelotas, pero el contraataque y el pick and roll la rompen.<br>• <b>Replegada</b> frena el contraataque y el juego interior, pero deja tirar de afuera.<br>• <b>Individual</b> es la más pareja: rinde según tus defensores; el pick and roll le hace daño.</p></div>';
+  $(h+'<button class="primary" onclick="'+bk+'">Volver</button>');
+}
+function planLine(){var P=tacPlan();return P.auto?'el asistente elige la táctica contra cada rival':TACO[P.o].n+' en ataque y '+TACD[P.d].n+' en defensa'}
+var showRoster0=showRoster;
+showRoster=function(msg){showRoster0(msg);var a=document.getElementById("app"),d=document.createElement("div");d.innerHTML='<button class="opt" onclick="showPlan()"><b>Plan de juego</b><span>'+planLine()+'</span></button>';var c=a.querySelector(".card");if(c)c.parentNode.insertBefore(d.firstChild,c);else a.appendChild(d.firstChild)};
+var showHub0=showHub;
+showHub=function(){showHub0();var a=document.getElementById("app"),b=a.querySelector('button[onclick^="simMine("]');if(b){var p=document.createElement("p");p.className="muted";p.style.cssText="font-size:13px;margin:6px 0 0";p.innerHTML='Al simular: '+planLine()+'. <a href="#" onclick="showPlan(\'h\');return false">Cambiar plan</a>';b.parentNode.insertBefore(p,b.nextSibling)}};
+</script>
+<style>
+.tg{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+@media (orientation:landscape) and (max-height:560px){.tg{grid-template-columns:repeat(6,1fr)}}
 </style>
 <script>if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost"))navigator.serviceWorker.register("sw.js").catch(function(){});</script>
 </body>
