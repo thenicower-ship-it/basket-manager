@@ -278,7 +278,7 @@ function LIDS(lg){lg=lg||(S&&S.lg)||"nba";return IDS.filter(function(i){return T
 var BASE={},ORDER=[],RANKL={},LSIZE={},LGL={};
 function injMap(){return (S&&S.inj)||{}}
 function ikey(id,p){return p.name}
-function healthy(id){var m=injMap(),RS=(S&&S.rush)||{},RT=(S&&S.rest)||{},mine=S&&id===S.my;var a=TEAMS[id].pl.filter(function(p){return !(m[ikey(id,p)]>0)});var b=a.filter(function(p){return mine?!RT[p.name]:enOf(p.name)>=35});if(b.length>=(mine?5:8))a=b;a=gre62(id,a);return a.map(function(p){return RS[p.name]?{name:p.name,pos:p.pos,off:p.off-6,def:p.def-6}:p})}
+function healthy(id){var m=injMap(),RS=(S&&S.rush)||{},RT=(S&&S.rest)||{},mine=S&&id===S.my;var a=TEAMS[id].pl.filter(function(p){return !(m[ikey(id,p)]>0)});var b=a.filter(function(p){return mine?!RT[p.name]:enOf(p.name)>=35});if(b.length>=(mine?5:8))a=b;a=gre62(id,a);if(a.length>mdMax(id))a=a.slice(0,mdMax(id));return a.map(function(p){return RS[p.name]?{name:p.name,pos:p.pos,off:p.off-6,def:p.def-6}:p})}
 function calcStr(id,list){
   var p=(list||healthy(id).map(function(x){var f=(0.8+0.2*enOf(x.name)/100)*(S&&id===S.my?morF(x.name)*tacF():1);return {off:x.off*f,def:x.def*f}})).slice(),o=0,d=0,bo=0,bd=0,i;
   while(p.length<8)p.push({off:55,def:55});
@@ -319,7 +319,7 @@ function deadline(){return Math.floor(S.sched.length*(S.fv===2?(S.lg==="nba"?0.6
 /* ---------- Reglas de fichajes reales (v37) ---------- */
 function midR(){return S.fv===2?Math.floor(S.sched.length*0.5):deadline()}
 function tradeOpen(){return S.phase==="reg"&&S.rnd<=deadline()}
-function rMax(){return S&&S.lg==="nba"?15:12}
+function rMax(){return S&&S.lg==="nba"?15:16}
 /* NBA: tope blando, impuesto de lujo, tope duro (apron) y excepción de nivel medio */
 function capL(){var b=S.bud[S.my];return {cap:b,tax:Math.round(b*1.2),apr:Math.round(b*1.3),mle:Math.max(2,Math.round(b*0.08))}}
 function mleLeft(){if(S.lg!=="nba"||S.mle===S.season)return 0;var L=capL(),pr=payroll(S.my);return Math.max(0,Math.min(L.mle,L.apr-pr))}
@@ -439,6 +439,8 @@ function stepPlayer(n,off,def){
   S.rt[n]=[no,nd];
   var r=Math.random();
   if(pot&&tag==="J"&&avg<pot-3)S.tag[n]="J";else if(tag==="J"&&r<0.3)S.tag[n]="P";else if(tag==="P"&&r<0.12)S.tag[n]="V";else S.tag[n]=tag;
+  var ag=ageOf(n);if(ag>=31)S.tag[n]="V";else if(S.tag[n]==="V"&&ag<=29)S.tag[n]="P";else if(S.tag[n]==="J"&&ag>=26&&!pot)S.tag[n]="P";
+  if(!S.dl)S.dl={};var dd=Math.round(((no-off)+(nd-def))/2);if(ag>=30)S.dl[n]=dd;else delete S.dl[n];
   return {name:n,oo:off,od:def,no:no,nd:nd,dl:Math.round(((no-off)+(nd-def))/2)};
 }
 function runProgression(){
@@ -466,6 +468,93 @@ function runProgression(){
     downs:all.slice().reverse().filter(function(r){return r.dl<0}).slice(0,3)
   };
 }
+
+/* ---------- Edad y retiros (v40) ---------- */
+/* S.by[n] = temporada de "nacimiento": edad = S.season - S.by[n]. Temporada 1 = 2026-27. */
+var REALBY={"LeBron James":1984,"Stephen Curry":1988,"Kevin Durant":1988,"James Harden":1989,"Kawhi Leonard":1991,"Paul George":1990,"Jimmy Butler":1989,"Mike Conley":1987,"Al Horford":1986,"Kyle Anderson":1993,"Klay Thompson":1990,"Kyrie Irving":1992,"Damian Lillard":1990,"Jrue Holiday":1990,"Marcus Smart":1994,"Steven Adams":1993,"Draymond Green":1990,"Andre Drummond":1993,"Brook Lopez":1988,"Bradley Beal":1993,"DeMar DeRozan":1989,"Khris Middleton":1991,"Tobias Harris":1992,"Harrison Barnes":1992,"Dennis Schroder":1993,"Nikola Vucevic":1990,"Dorian Finney-Smith":1993,"Tim Hardaway Jr.":1992,"Kentavious Caldwell-Pope":1993,"Jusuf Nurkic":1994,"C.J. McCollum":1991,"Anthony Davis":1993,"Rudy Gobert":1992,"T.J. McConnell":1992,"Maxi Kleber":1992,
+"Ricky Rubio":1990,"Sergio Llull":1987,"Facu Campazzo":1991,"Marcelinho Huertas":1983,"Ante Tomic":1987,"Nikola Mirotic":1991,"Nihad Djedovic":1990,"Kyle Kuric":1989,"Edy Tavares":1992,"Alberto Díaz":1994,
+"Kostas Sloukas":1990,"Nick Calathes":1989,"Kostas Papanikolaou":1990,"Evan Fournier":1992,"Jerian Grant":1992,"Vangelis Mantzaris":1990,"Derrick Williams":1991,"Moustapha Fall":1992,"Thomas Heurtel":1989,
+"Isaiah Canaan":1991,"Scottie Wilbekin":1993,"Nicolò Melli":1991,"Errick McCollum":1988,"Will Clyburn":1990,"Shane Larkin":1992};
+function nmHash(n){var h=7;for(var i=0;i<n.length;i++)h=(h*31+n.charCodeAt(i))%100003;return h}
+function ageOf(n){
+  if(!S)return null;if(!S.by)S.by={};
+  if(S.by[n]==null){
+    var a;
+    if(REALBY[n])a=2026-REALBY[n]+(S.season||1)-1;
+    else{var t=tagOf(null,{name:n}),h=nmHash(n);a=t==="J"?(S.pot&&S.pot[n]?17+h%2:19+h%5):t==="V"?30+h%6:24+h%6}
+    S.by[n]=(S.season||1)-a;
+  }
+  return (S.season||1)-S.by[n];
+}
+function ageTxt(n){var a=ageOf(n);return a==null?"":a+" años"}
+function retLast(n){return !!(S.retA&&S.retS===S.season&&S.retA[n])}
+function retTeam(n){var t=S.own[n]||(ALL[n]&&ALL[n].home);return t}
+function retP(age,rel,dl,fa){
+  if(age>=40)return 1;
+  var T={30:.02,31:.04,32:.08,33:.14,34:.22,35:.35,36:.5,37:.65,38:.8,39:.9},p=T[age]||0;
+  if(!p)return 0;
+  if(rel>=8)p*=0.6;else if(rel>=4)p*=0.8;else if(rel<=-4)p*=1.3;
+  if(dl!=null&&dl<=-2)p*=1.3;
+  if(fa)p*=2.5;
+  return Math.min(0.95,p);
+}
+function lgLevels(){var L={},c={};IDS.forEach(function(id){var lg=TEAMS[id].lg;TEAMS[id].pl.forEach(function(p){L[lg]=(L[lg]||0)+(p.off+p.def)/2;c[lg]=(c[lg]||0)+1})});Object.keys(L).forEach(function(k){L[k]/=c[k]});return L}
+/* A mitad de temporada: quién anuncia que se retira al final. quiet = sin noticias (partidas viejas). */
+function retireAnnounce(quiet){
+  if(S.retS===S.season)return;
+  S.retS=S.season;S.retA={};
+  var LV=lgLevels(),mine=[],lgN=[];
+  Object.keys(ALL).forEach(function(n){
+    var t=retTeam(n);if(!t||t==="FA"||t==="GONE"||!TEAMS[t])return;
+    var lg=TEAMS[t].lg;if(LCFG[lg].guest)return;
+    var age=ageOf(n);if(age<30)return;
+    var r=ratingOf(n),avg=(r.off+r.def)/2,dl=S.dl&&S.dl[n];
+    if(Math.random()<retP(age,avg-(LV[lg]||avg),dl,false)){
+      S.retA[n]=1;
+      if(t===S.my)mine.push(n);else if(lg===S.lg&&avg>=(LV[lg]||0)+4)lgN.push({n:n,t:t,a:age,v:avg});
+    }
+  });
+  if(quiet)return;
+  mine.forEach(function(n){addNews(n+" anunció que esta es su última temporada: se retira a los "+ageOf(n)+" años cuando termine el campeonato. Andá pensando en su reemplazo.","ret")});
+  lgN.sort(function(a,b){return b.v-a.v});
+  if(lgN.length)addNews("Anunciaron su retiro para el final de la temporada: "+lgN.slice(0,4).map(function(x){return x.n+" ("+TEAMS[x.t].name+", "+x.a+")"}).join(", ")+".","ret");
+}
+/* Al terminar la temporada se retiran los que lo anunciaron, y algunos agentes libres veteranos. */
+function retireApply(){
+  if(S.retDone===S.season)return S.retLast||null;
+  if(S.retS!==S.season)retireAnnounce(true);
+  var LV=lgLevels(),out={mine:[],lg:[],n:0};
+  Object.keys(ALL).forEach(function(n){
+    var t=retTeam(n);if(!t||t==="GONE")return;
+    var age=ageOf(n),go=false;
+    if(t==="FA"){if(age>=30){var r=ratingOf(n),lg=ALL[n].lg||"nba";go=Math.random()<retP(age,(r.off+r.def)/2-(LV[lg]||60),S.dl&&S.dl[n],true)}}
+    else go=!!S.retA[n];
+    if(!go)return;
+    out.n++;
+    if(t!=="FA"&&TEAMS[t]){
+      var T=TEAMS[t],i=T.pl.findIndex(function(p){return p.name===n});
+      var r2=ratingOf(n),x={name:n,team:t,age:age,ovr:Math.round((r2.off+r2.def)/2)};
+      if(i>=0){x.ovr=Math.round((T.pl[i].off+T.pl[i].def)/2);T.pl.splice(i,1)}
+      if(t===S.my)out.mine.push(x);else if(T.lg===S.lg)out.lg.push(x);
+    }
+    S.own[n]="GONE";
+    if(S.inj)Object.keys(S.inj).forEach(function(k){if(k===n||k.split(":").slice(1).join(":")===n)delete S.inj[k]});
+  });
+  out.lg.sort(function(a,b){return b.ovr-a.ovr});out.lg=out.lg.slice(0,6);
+  out.mine.forEach(function(x){addNews(x.name+" se retiró a los "+x.age+" años. Gracias por todo.","ret")});
+  if(out.lg.length)addNews("Se retiraron de la liga: "+out.lg.map(function(x){return x.name+" ("+x.age+")"}).join(", ")+".","ret");
+  S.retDone=S.season;S.retLast=out;S.retA={};
+  rebuildBase();refreshStr();
+  return out;
+}
+function retireHTML(R){
+  if(!R||(!R.mine.length&&!R.lg.length))return "";
+  var row=function(x){return '<div class="gm"><span>'+x.name+' <span class="muted">'+TEAMS[x.team].name+' · '+x.age+' años</span></span><b>'+x.ovr+'</b></div>'};
+  return '<div class="card"><h2>Retiros</h2>'+(R.mine.length?'<p class="muted">De tu equipo</p>'+R.mine.map(row).join(""):'')+
+    (R.lg.length?'<p class="muted"'+(R.mine.length?' style="margin-top:10px"':'')+'>Figuras de la liga que se retiran</p>'+R.lg.map(row).join(""):'')+
+    '<p class="muted" style="margin-top:8px">En total se retiraron '+R.n+' jugadores en todas las ligas.</p></div>';
+}
+function mdMax(id){return TEAMS[id]&&TEAMS[id].lg==="nba"?13:12}
 function trimFA(lg){
   lg=lg||S.lg;var fa=[];
   Object.keys(ALL).forEach(function(n){
@@ -783,7 +872,8 @@ function finishSeason(){
   }
   var s=S.st[S.my];
   var aw=seasonAwards();
-  S.fin={d:d,old:old,act:act,exp:exp,offers:offers,fired:fired,w:s.w,l:s.l,cups:cups,aw:aw,wc:S.wc&&S.wc.done?{ch:S.wc.champ,my:S.wc.my,b:wcb}:null};
+  var ret=retireApply();
+  S.fin={ret:ret,d:d,old:old,act:act,exp:exp,offers:offers,fired:fired,w:s.w,l:s.l,cups:cups,aw:aw,wc:S.wc&&S.wc.done?{ch:S.wc.champ,my:S.wc.my,b:wcb}:null};
   seasonClose(aw,act,cups);finSeasonEnd();
   save();
 }
@@ -806,7 +896,7 @@ function commitMine0(pa,pb,opp){
     streak(pa>pb);
     if(S.rnd<deadline()&&Math.random()<(euroMkt()?0.25:0.1)){if(euroMkt())aiTransfer();else aiTrade()}
     if(S.rnd<deadline())makeOffer();
-    S.rnd++;oxTick();schedFix();boardMid();coachInterest();vacTick();if(S.rnd===midR())trainMid();
+    S.rnd++;oxTick();schedFix();boardMid();coachInterest();vacTick();if(S.rnd===midR()){trainMid();retireAnnounce()}
     if(S.evt){S.ei++;advanceAuto()}else if(S.rnd>=S.sched.length)startPO();
   }else{
     var cp=commitPO(pa,pb,opp);
@@ -955,15 +1045,17 @@ function showSelect(){
   $(h);
 }
 function rosterHTML(id,cut){
-  var h="",m=injMap(),go=greOut(id);
+  var h="",m=injMap(),go=greOut(id),md={},hl=healthy(id);hl.forEach(function(p){md[p.name]=1});
   TEAMS[id].pl.forEach(function(p,i){
     var g=m[ikey(id,p)];
     var tag=g>0?' · <span class="lose">lesionado ('+g+')</span>':(i<5?' · titular':'');
     var rs=S.rest&&S.rest[p.name];
     if(go[p.name])tag+=' · <span class="lose">no juega (cupo 6+2)</span>';
+    else if(!(g>0)&&!md[p.name]&&hl.length>=mdMax(id))tag+=' · <span class="muted">fuera de la planilla</span>';
+    if(retLast(p.name))tag+=' · <b>último año</b>';
     if(cut&&!(g>0))tag+=' · energía <span class="'+enColor(enOf(p.name))+'">'+enOf(p.name)+'%</span>'+(rs?' · <b>descansa</b>':'')+' · ánimo '+morHTML(p.name);
     var btn=cut?'<br><button class="ghost" style="padding:4px 8px;min-height:30px;font-size:12px;margin-top:4px" onclick="cutPlayer('+i+')">'+(CUTARM===i?"Confirmar":"Cortar")+'</button>'+(canRest()&&!(g>0)?'<button class="ghost" style="padding:4px 8px;min-height:30px;font-size:12px;margin-top:4px" onclick="toggleRest('+i+')">'+(rs?"Que juegue":"Descansar")+'</button>':'')+(canTalk(p.name)?'<button class="ghost" style="padding:4px 8px;min-height:30px;font-size:12px;margin-top:4px" onclick="talkP('+i+')">Hablar</button>':''):'';
-    h+='<div class="pl"><div><div class="n"'+(cut?' style="cursor:pointer;text-decoration:underline dotted" onclick="showPlayerT(\''+id+'\','+i+')"':'')+'>'+p.name+'</div><div class="s">'+p.pos+' · '+tagLabel(tagOf(null,p))+(S.pot&&S.pot[p.name]?' · canterano':ALL[p.name]&&(ALL[p.name].fict||ALL[p.name].inv)?' · ficticio':ALL[p.name]&&ALL[p.name].unc?' · sin confirmar':'')+tag+'</div></div><div class="s" style="text-align:right">ATQ '+p.off+'<br>DEF '+p.def+'<br>'+Math.round(S.sal[p.name]||0)+' M · '+(S.yrs[p.name]||1)+' a.'+btn+'</div></div>';
+    h+='<div class="pl"><div><div class="n"'+(cut?' style="cursor:pointer;text-decoration:underline dotted" onclick="showPlayerT(\''+id+'\','+i+')"':'')+'>'+p.name+'</div><div class="s">'+p.pos+' · '+ageTxt(p.name)+' · '+tagLabel(tagOf(null,p))+(S.pot&&S.pot[p.name]?' · canterano':ALL[p.name]&&(ALL[p.name].fict||ALL[p.name].inv)?' · ficticio':ALL[p.name]&&ALL[p.name].unc?' · sin confirmar':'')+tag+'</div></div><div class="s" style="text-align:right">ATQ '+p.off+'<br>DEF '+p.def+'<br>'+Math.round(S.sal[p.name]||0)+' M · '+(S.yrs[p.name]||1)+' a.'+btn+'</div></div>';
   });
   return h;
 }
@@ -1083,7 +1175,7 @@ function showRoster(msg){
   var id=S.my;
   var h='<h1>Tu plantilla</h1><p class="muted">'+TEAMS[id].name+'</p>'+budBar(id)+extBar(id);
   if(msg)h+='<div class="card offer"><p>'+msg+'</p></div>';
-  h+='<div class="card">'+rosterHTML(id,true)+'</div><p class="muted">Cortar a un jugador lo deja libre y libera espacio en el tope. La energía baja al jugar y se recupera en parte entre partidos; un jugador que descansa no juega el próximo partido y llega más fresco. El ánimo sube con victorias y minutos, y baja si no juega o se pierde; un jugador contento rinde un poco más. Podés hablar con cada jugador cada 5 fechas. Tocá el nombre de un jugador para ver sus atributos.</p><button class="primary" onclick="showHub()">Volver</button>';
+  h+='<div class="card">'+rosterHTML(id,true)+'</div><p class="muted">Cortar a un jugador lo deja libre y libera espacio en el tope. La energía baja al jugar y se recupera en parte entre partidos; un jugador que descansa no juega el próximo partido y llega más fresco. El ánimo sube con victorias y minutos, y baja si no juega o se pierde; un jugador contento rinde un poco más. Podés hablar con cada jugador cada 5 fechas. En cada partido van a la planilla los '+mdMax(id)+' mejores disponibles; el resto queda afuera. Desde los 30 años los jugadores pueden anunciar su retiro a mitad de temporada. Tocá el nombre de un jugador para ver sus atributos.</p><button class="primary" onclick="showHub()">Volver</button>';
   $(h);
 }
 function showEnd(){
@@ -1094,6 +1186,7 @@ function showEnd(){
      '<p class="muted">Se esperaba el puesto '+f.exp+' por la fuerza del plantel.</p></div>';
   if(f.wc)h+='<div class="card"><h2>Mundial de clubes</h2><p>Campeón: <b>'+TEAMS[f.wc.ch].name+'</b>'+(f.wc.my?'<br><span class="muted">Tu equipo: '+WCL[f.wc.my]+' (+'+f.wc.b+' de reputación)</span>':'')+'</p></div>';
   if(f.aw)h+=awardsHTML(f.aw);
+  h+=retireHTML(f.ret);
   if(f.cups&&f.cups.length)h+='<div class="card"><h2>Copas y torneos</h2>'+f.cups.map(function(x){return '<p>'+CUPS[x.c].name+': campeón <b>'+(x.champ?TEAMS[x.champ].name:'-')+'</b>'+(x.my?'<br><span class="muted">Tu equipo: '+MYL[x.my]+(x.b?' (+'+x.b+' de reputación)':'')+'</span>':'')+'</p>'}).join("")+'</div>';
   h+='<div class="card"><div class="row"><span>Reputación</span><b class="'+(f.d>=0?"win":"lose")+'">'+(f.d>=0?"+":"")+f.d+'</b></div><div class="progress"><i style="width:'+S.rep+'%"></i></div><p class="muted" style="margin-top:8px">'+S.rep+'/100</p></div>';
   if(f.fired){
@@ -1125,9 +1218,9 @@ function showProg(){
   P.downs.forEach(function(r){h+='<div class="gm"><span>'+r.name+' <span class="muted">'+TEAMS[r.team].name+'</span></span><b class="lose">'+r.dl+'</b></div>'});
   h+='</div>';
   if(P.freed&&P.freed.length){h+='<div class="card"><h2>Quedaron libres</h2><p class="muted">Ya están en agentes libres.</p>'+P.freed.map(function(r){return '<div class="gm"><span>'+r.name+' <span class="muted">'+r.team+'</span></span><b>'+r.ovr+'</b></div>'}).join("")+'</div>'}
-  var nPl=TEAMS[S.my].pl.length,short=nPl<8||nPl>12;
+  var nPl=TEAMS[S.my].pl.length,short=nPl<8||nPl>rMax();
   if(nPl<8)h+='<div class="card offer"><p>Tenés solo '+nPl+' jugadores. Necesitás al menos 8: fichá agentes libres en el Mercado.</p></div>';
-  if(nPl>12)h+='<div class="card offer"><p>Tenés '+nPl+' jugadores y el máximo es 12. Cortá a alguien desde Plantilla.</p><button class="ghost" style="margin-top:8px" onclick="showRoster()">Ir a Plantilla</button></div>';
+  if(nPl>rMax())h+='<div class="card offer"><p>Tenés '+nPl+' jugadores y el máximo es '+rMax()+'. Cortá a alguien desde Plantilla.</p><button class="ghost" style="margin-top:8px" onclick="showRoster()">Ir a Plantilla</button></div>';
   h+='<button class="ghost" style="margin-bottom:8px" onclick="showMarket()">Mercado</button><button class="primary" '+(short?'disabled style="opacity:.5"':'')+' onclick="startSeason()">Empezar la temporada</button>';
   $(h);
 }
@@ -1350,7 +1443,7 @@ function playerVal(p){
 }
 function budBar(id){
   var pr=payroll(id),b=S.bud[id],pc=Math.min(100,Math.round(pr/b*100));
-  return '<div class="card"><div class="row"><span>Sueldos</span><b>'+Math.round(pr)+' / '+b+' M</b></div><div class="progress"><i style="width:'+pc+'%"></i></div><p class="muted" style="margin-top:8px">Plantilla: '+TEAMS[id].pl.length+' jugadores (mínimo 8, máximo '+(id===S.my?rMax():12)+'). Los sueldos son estimados.</p>'+(id===S.my&&S.lg==="nba"?nbaCapHTML():'')+'</div>';
+  return '<div class="card"><div class="row"><span>Sueldos</span><b>'+Math.round(pr)+' / '+b+' M</b></div><div class="progress"><i style="width:'+pc+'%"></i></div><p class="muted" style="margin-top:8px">Plantilla: '+TEAMS[id].pl.length+' jugadores (mínimo 8, máximo '+(TEAMS[id].lg==="nba"?15:16)+'; '+mdMax(id)+' van a la planilla de cada partido). Los sueldos son estimados.</p>'+(id===S.my&&S.lg==="nba"?nbaCapHTML():'')+'</div>';
 }
 function mktRule(){
   if(S.fv!==2)return "El mercado cierra después de la fecha "+deadline()+".";
@@ -1391,7 +1484,7 @@ function tgl(side,i){
 }
 function prow(p,sel,side,i){
   var inj=injMap()[p.name]>0?' · lesionado':'';
-  return '<button class="opt'+(sel?' sel':'')+'" onclick="tgl(\''+side+'\','+i+')"><b>'+p.name+'</b><span>'+p.pos+' · '+tagLabel(tagOf(null,p))+(S.pot&&S.pot[p.name]?' · canterano':ALL[p.name]&&(ALL[p.name].fict||ALL[p.name].inv)?' · ficticio':ALL[p.name]&&ALL[p.name].unc?' · sin confirmar':'')+' · ATQ '+p.off+' · DEF '+p.def+' · '+Math.round(S.sal[p.name]||0)+' M · '+(S.yrs[p.name]||1)+(S.yrs[p.name]===1?' año':' años')+inj+'</span></button>';
+  return '<button class="opt'+(sel?' sel':'')+'" onclick="tgl(\''+side+'\','+i+')"><b>'+p.name+'</b><span>'+p.pos+' · '+ageTxt(p.name)+' · '+tagLabel(tagOf(null,p))+(S.pot&&S.pot[p.name]?' · canterano':ALL[p.name]&&(ALL[p.name].fict||ALL[p.name].inv)?' · ficticio':ALL[p.name]&&ALL[p.name].unc?' · sin confirmar':'')+' · ATQ '+p.off+' · DEF '+p.def+' · '+Math.round(S.sal[p.name]||0)+' M · '+(S.yrs[p.name]||1)+(S.yrs[p.name]===1?' año':' años')+inj+'</span></button>';
 }
 function showTrade(keep){
   var t=TEAMS[TR.id],mine=TEAMS[S.my].pl;
@@ -2724,10 +2817,10 @@ function showPlayerT(id,i,back){
   var p=TEAMS[id].pl[i];if(!p)return;
   var a=attrs(p),mine=id===S.my,r=S.ps&&S.ps[p.name],tag=tagOf(null,p);
   var bk=back==="b"?"showBuy('"+id+"')":mine?"showRoster()":"showHub()";
-  var h='<h1>'+p.name+'</h1><p class="muted" style="margin:0 0 10px">'+p.pos+' · '+tagLabel(tag)+' · '+TEAMS[id].name+(CAPX[S.lg]?(isExt(p.name)?' · extranjero en tu liga':' · local en tu liga'):'')+'</p>';
+  var h='<h1>'+p.name+'</h1><p class="muted" style="margin:0 0 10px">'+p.pos+' · '+ageTxt(p.name)+' · '+tagLabel(tag)+' · '+TEAMS[id].name+(CAPX[S.lg]?(isExt(p.name)?' · extranjero en tu liga':' · local en tu liga'):'')+'</p>';
   h+='<div class="card"><h2>Atributos</h2>'+abar("Ataque",p.off)+abar("Defensa general",p.def)+
      abar(ATN.tir,a.tir)+abar(ATN.int,a.int)+abar(ATN.pas,a.pas)+abar(ATN.reb,a.reb)+abar(ATN.dfn+" individual",a.dfn)+
-     '<p class="muted" style="margin-top:8px">Destaca en: <b>'+bestAttr(p)+'</b>.</p></div>';
+     '<p class="muted" style="margin-top:8px">Destaca en: <b>'+bestAttr(p)+'</b>.</p></div>'+(retLast(p.name)?'<div class="card offer"><p>Anunció que esta es su última temporada: se retira a los '+ageOf(p.name)+' años cuando termine el campeonato.</p></div>':'');
   h+='<div class="card"><div class="gm"><span>Sueldo</span><b>'+Math.round(S.sal[p.name]||0)+' M · '+(S.yrs[p.name]||1)+((S.yrs[p.name]||1)===1?' año':' años')+'</b></div>'+
      (mine?'<div class="gm"><span>Ánimo</span><b>'+morHTML(p.name)+'</b></div><div class="gm"><span>Energía</span><b class="'+enColor(enOf(p.name))+'">'+enOf(p.name)+'%</b></div>':'')+
      (r&&r[0]?'<div class="gm"><span>Esta temporada</span><b>'+f1(r[1]/r[0])+' pts · '+f1(r[2]/r[0])+' reb · '+f1(r[3]/r[0])+' ast'+(r[6]?' · '+f1(r[5]/r[6])+' PIR':'')+'</b></div>':'')+'</div>';
@@ -3762,7 +3855,7 @@ function showSave(msg){
   PRECODE="";if(navigator.share&&S&&S.my){packState().then(function(c){PRECODE=c})}
 }
 /* El iPhone solo abre Compartir si se llama apenas se toca el botón: el código se arma antes, al abrir la pantalla */
-var PRECODE="",GAMEVER="39.1";
+var PRECODE="",GAMEVER="40";
 function shareCode(){
   if(!PRECODE){exportCode();return}
   navigator.share({title:"Partida Basket Manager",text:PRECODE}).then(function(){toast("Código enviado ✓")},function(e){if(!e||e.name!=="AbortError")exportCode()});
